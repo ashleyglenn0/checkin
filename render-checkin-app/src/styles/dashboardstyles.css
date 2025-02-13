@@ -1,0 +1,93 @@
+/* General Container Styling */
+.dashboard-container,
+.schedule-container {
+  height: 90vh;
+  width: 100vw; /* Full viewport width */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: flex-start;
+  padding: 20px;
+  border-radius: 20px;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+  overflow-y: auto;
+}
+
+/* Render's Color Scheme */
+.dashboard-container.render,
+.schedule-container.render {
+  background-color: #FDF0E2;
+  color: #711B43;
+}
+
+/* ATL Tech Week's Color Scheme */
+.dashboard-container.atl-tech-week,
+.schedule-container.atl-tech-week {
+  background-color: #E0F7FA;
+  color: #004D40;
+}
+
+/* Section Cards */
+.dashboard-section,
+.schedule-section {
+  background: white;
+  padding: 20px;
+  margin: 15px;
+  border-radius: 20px;
+  width: 80%; /* Keeps cards centered */
+  max-width: 1000px; /* Prevents stretching too much */
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+  text-align: center;
+}
+
+/* Ensure Table is Full Width */
+.schedule-table {
+  width: 100%;
+  max-width: 1200px;
+  margin-top: 20px;
+  border-collapse: collapse;
+  background: white;
+  border-radius: 10px;
+  overflow: hidden;
+  box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.15);
+}
+
+.schedule-table th, .schedule-table td {
+  padding: 15px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+.schedule-table th {
+  background-color: #FE88DF;
+  color: white;
+}
+
+.schedule-container.atl-tech-week .schedule-table th {
+  background-color: #00ACC1;
+}
+
+/* Navigation Buttons */
+.dashboard-buttons,
+.schedule-buttons {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+  margin-top: 20px;
+}
+
+.dashboard-buttons button,
+.schedule-buttons button {
+  background-color: #FE88DF;
+  color: white;
+  padding: 10px 15px;
+  border: none;
+  font-size: 16px;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.dashboard-container.atl-tech-week .dashboard-buttons button,
+.schedule-container.atl-tech-week .schedule-buttons button {
+  background-color: #00ACC1;
+}

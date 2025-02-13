@@ -1,0 +1,44 @@
+/* Default Render Theme */
+.theme-container.render {
+    background-color: #FDF0E2;
+    color: #711B43;
+    text-align: center;
+    padding: 20px;
+    height: 100vh;
+  }
+  
+  /* ATL Tech Week Theme */
+  .theme-container.atl-tech-week {
+    background-color: #E0F7FA;
+    color: #004D40;
+    text-align: center;
+    padding: 20px;
+    height: 100vh;
+  }
+  
+  /* Card Style */
+  .theme-card {
+    background: white;
+    padding: 20px;
+    margin: 20px auto;
+    border-radius: 10px;
+    width: 60%;
+    box-shadow: 0px 4px 10px rgba(0, 0, 0, 0.1);
+  }
+  
+  /* Toggle Button */
+  .toggle-button {
+    background-color: #FE88DF;
+    color: white;
+    padding: 10px 15px;
+    border: none;
+    font-size: 16px;
+    border-radius: 5px;
+    cursor: pointer;
+    margin-top: 10px;
+  }
+  
+  .theme-container.atl-tech-week .toggle-button {
+    background-color: #00ACC1;
+  }
+  
