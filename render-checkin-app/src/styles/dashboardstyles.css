@@ -91,3 +91,15 @@
 .schedule-container.atl-tech-week .schedule-buttons button {
   background-color: #00ACC1;
 }
+
+.toggle-button {
+  height: 42px; /* Match the height of the other buttons */
+  padding: 10px 15px;
+  background-color: #FE88DF;
+  color: white;
+  border: none;
+  font-size: 16px;
+  border-radius: 5px;
+  cursor: pointer;
+  box-sizing: border-box;
+}
