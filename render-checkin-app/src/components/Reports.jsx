@@ -2,8 +2,8 @@ import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import "../styles/reportstyles.css";
 
-const RENDER_SHEET_ID = process.env.REACT_APP_RENDER_SHEET_ID; // Render Spreadsheet ID
-const ATL_SHEET_ID = process.env.REACT_APP_ATL_SHEET_ID;// ATL Tech Week Spreadsheet ID
+const RENDER_SHEET_ID = import.meta.env.REACT_APP_RENDER_SHEET_ID; // Render Spreadsheet ID
+const ATL_SHEET_ID = import.meta.env.REACT_APP_ATL_SHEET_ID;// ATL Tech Week Spreadsheet ID
 
 const Reports = () => {
   const [isAtlTechWeek, setIsAtlTechWeek] = useState(

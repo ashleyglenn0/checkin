@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useNavigate, Link } from "react-router-dom";
 import { db } from "../config/firebaseConfig";
 import { collection, query, where, onSnapshot } from "firebase/firestore";
 import { Timestamp } from "firebase/firestore"; // ✅ Import Firestore Timestamp
@@ -92,11 +92,17 @@ const Dashboard = () => {
       {/* ✅ Buttons moved to the top */}
       <div className="dashboard-buttons">
         <button onClick={() => navigate("/")}>🔙 Back to Check-In</button>
-        <button className="toggle-button" onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
+        <button className="toggle-button dashboard-buttons" onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
           Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
         </button>
         <button onClick={() => navigate("/schedule")}>📅 View Schedule</button>
         <button onClick={() => navigate("/reports")}>📊 View Reports</button>
+        <Link to="/qr-scanner">
+        <button>Scan QR Code</button>
+      </Link>
+      <Link to="/task-dashboard">
+        <button>View Task Dashboard</button>
+      </Link>
       </div>
 
       {/* 🔹 Date Picker for Viewing Past Check-Ins */}

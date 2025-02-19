@@ -1,0 +1,127 @@
+.task-dashboard-container {
+  padding: 15px;
+  min-height: 100vh;
+  font-family: Arial, sans-serif;
+  transition: background-color 0.3s ease;
+}
+
+.render-theme {
+  background-color: #FDF0E2;
+  color: #711B43;
+}
+
+.atl-tech-week-theme {
+  background-color: #D4F0F4;
+  color: #005E5E;
+}
+
+h2 {
+  text-align: center;
+  font-size: 1.8rem;
+  margin-bottom: 15px;
+}
+
+.task-panel {
+  background-color: #ffffff;
+  border-radius: 8px;
+  margin: 10px 0;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+}
+
+summary {
+  font-size: 1.3rem;
+  font-weight: bold;
+  cursor: pointer;
+  padding: 8px 0;
+}
+
+table {
+  width: 100%;
+  border-collapse: collapse;
+  margin-top: 10px;
+  font-size: 14px;
+}
+
+th, td {
+  padding: 8px;
+  text-align: left;
+  border-bottom: 1px solid #ddd;
+}
+
+th {
+  background-color: #FE88DF;
+  color: #fff;
+}
+
+.atl-tech-week-theme th {
+  background-color: #17BEBB;
+}
+
+.dashboard-buttons {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+  padding: 0 5px;
+}
+
+button {
+  padding: 8px 15px;
+  font-size: 14px;
+  border: none;
+  cursor: pointer;
+  border-radius: 5px;
+  transition: background-color 0.2s;
+}
+
+.render-theme .dashboard-buttons button {
+  background-color: #FE88DF;
+  color: #fff;
+}
+
+.atl-tech-week-theme .dashboard-buttons button {
+  background-color: #17BEBB;
+  color: #fff;
+}
+
+button:hover {
+  opacity: 0.9;
+}
+
+.event-toggle {
+  display: flex;
+  justify-content: center;
+  margin-bottom: 15px;
+}
+
+.event-toggle button {
+  margin: 0 8px;
+  padding: 8px 15px;
+}
+
+.event-toggle .active {
+  border: 2px solid #000;
+  font-weight: bold;
+}
+
+.render-theme {
+  background-color: #FFE6F0; /* Light pink for Render */
+  color: #711B43;
+}
+
+.atl-tech-week-theme {
+  background-color: #D4F0F4;
+  color: #005E5E;
+}
+
+.task-panel {
+  background-color: #fff0f5; /* Soft pink for Render panels */
+  border-radius: 8px;
+  margin: 10px 0;
+  box-shadow: 0 3px 6px rgba(0, 0, 0, 0.1);
+  padding: 10px;
+}
+
+.atl-tech-week-theme .task-panel {
+  background-color: #E6F7F8; /* Soft teal for ATL Tech Week panels */
+}
