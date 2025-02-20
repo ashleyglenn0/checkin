@@ -59,7 +59,7 @@ const App = () => {
         <Route path="/teamlead/task-checkin" element={<TaskCheckInForm />} />
 
         <Route element={<RoleBasedAccess allowedRoles={["admin"]} />}>
-          <Route path="/admin/checkin" element={<CheckInForm/>} />
+          <Route path="/admin/checkin" element={<CheckInForm showAdminButtons={true} />} />
           <Route path="/admin/dashboard" element={<Dashboard />} />
           <Route path="/admin/qr-code" element={<AdminQRCode />} />
           <Route path="/admin/reports" element={<Reports />} />

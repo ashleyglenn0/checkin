@@ -4,27 +4,33 @@ import { db, checkInsRef } from "../config/firebaseConfig";
 import { collection, query, where, getDocs, addDoc, Timestamp } from "firebase/firestore";
 import "../styles.css";
 
-const CheckInForm = () => {
+const CheckInForm = ({ showAdminButtons = false }) => {
   const [searchParams] = useSearchParams();
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [staffMember, setStaffMember] = useState(null);
-  const [isButtonDisabled, setIsButtonDisabled] = useState(false);
   const [isAtlTechWeek, setIsAtlTechWeek] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false); // ✅ Track admin status
+  const [isAdmin, setIsAdmin] = useState(false); // Track admin role
   const navigate = useNavigate();
 
   const isQRScan = searchParams.has("staff");
 
-  // ✅ Check localStorage for admin info on mount
   useEffect(() => {
-    const adminInfo = JSON.parse(localStorage.getItem("adminInfo"));
-    setIsAdmin(adminInfo?.role === "admin");
-  }, []);
+    const storedAdmin = JSON.parse(localStorage.getItem("adminInfo"));
+    if (storedAdmin?.role === "admin") setIsAdmin(true);
+
+    const qrStaff = searchParams.get("staff");
+    if (qrStaff) setStaffMember(qrStaff); // Staff member from QR code
+  }, [searchParams]);
 
   const handleCheckInOut = async (statusType) => {
     if (!firstName || !lastName) {
       alert("⚠️ Please enter both first and last name.");
+      return;
+    }
+
+    if (!staffMember) {
+      alert("⚠️ Please select the staff member checking in the volunteer.");
       return;
     }
 
@@ -36,42 +42,31 @@ const CheckInForm = () => {
       );
       const userSnapshot = await getDocs(userQuery);
 
-      if (statusType === "Checked In" && !userSnapshot.empty) {
-        const user = userSnapshot.docs[0].data();
+      const isUserAdmin = !userSnapshot.empty && userSnapshot.docs[0].data().role === "admin";
 
-        // ✅ Handle Admin Role
-        if (user.role === "admin") {
-          localStorage.setItem("userInfo", JSON.stringify({ firstName, lastName, role: "admin" }));
-          setIsAdmin(true); // Update state for immediate UI feedback
-          navigate("/admin/dashboard"); // Redirect to dashboard
-          return;
-        }
+      if (statusType === "Checked In" && isUserAdmin) {
+        // ✅ Admin detected → save to localStorage and redirect
+        localStorage.setItem("adminInfo", JSON.stringify({ firstName, lastName, role: "admin" }));
+        setIsAdmin(true);
+        alert("✅ Admin successfully checked in. Redirecting to dashboard...");
+        navigate("/admin/dashboard");
+        return;
       }
 
-      // ✅ Normal volunteer check-in/out
-      await addDoc(checkInsRef, {
-        first_name: firstName,
-        last_name: lastName,
-        status: statusType,
-        timestamp: Timestamp.now(),
-        staff_qr: staffMember || "manual-entry",
-        isAtlTechWeek: Boolean(isAtlTechWeek),  // ✅ Ensure it's a boolean (true/false)
-      });
+      // ✅ Normal volunteer check-in (skip if admin)
+      if (!isUserAdmin) {
+        await addDoc(checkInsRef, {
+          first_name: firstName,
+          last_name: lastName,
+          status: statusType,
+          staff_qr: staffMember,
+          timestamp: Timestamp.now(),
+          isAtlTechWeek,
+        });
 
-      alert(`✅ Successfully ${statusType}!`);
-      if (statusType === "Checked Out") {
-        // ✅ Clear admin info and reset form
-        localStorage.removeItem("adminInfo");
-        setIsAdmin(false);
+        alert(`✅ Volunteer successfully ${statusType}!`);
         setFirstName("");
         setLastName("");
-        setStaffMember(null);
-        setIsButtonDisabled(false); // Re-enable buttons
-  
-        // ✅ Redirect back to check-in form
-        navigate("/");
-      } else {
-        setIsButtonDisabled(true); // Prevent double submissions
       }
     } catch (error) {
       console.error("🔥 Error:", error);
@@ -97,13 +92,12 @@ const CheckInForm = () => {
       />
 
       {!isQRScan && (
-        <select
-          onChange={(e) => setStaffMember(e.target.value)}
-          value={staffMember || ""}
-        >
+        <select onChange={(e) => setStaffMember(e.target.value)} value={staffMember || ""}>
           <option value="">Select Staff Member</option>
           {["Ashley", "Mikal", "Reba", "Lloyd"].map((staff) => (
-            <option key={staff} value={staff}>{staff}</option>
+            <option key={staff} value={staff}>
+              {staff}
+            </option>
           ))}
         </select>
       )}
@@ -118,37 +112,25 @@ const CheckInForm = () => {
       </label>
 
       <div style={{ marginTop: "20px" }}>
-        <button
-          className="dashboard"
-          onClick={() => handleCheckInOut("Checked In")}
-          disabled={isButtonDisabled}
-        >
+        <button className="dashboard" onClick={() => handleCheckInOut("Checked In")}>
           Check In
         </button>
         <button
           className="dashboard"
           onClick={() => handleCheckInOut("Checked Out")}
-          disabled={isButtonDisabled}
           style={{ marginLeft: "10px" }}
         >
           Check Out
         </button>
       </div>
 
-      {/* ✅ Show admin-specific buttons only if isAdmin is true */}
-      {isAdmin && (
+      {/* ✅ Show admin-specific buttons only if showAdminButtons is true and user is admin */}
+      {showAdminButtons && isAdmin && (
         <div style={{ marginTop: "20px" }}>
-          <button
-            className="dashboard"
-            onClick={() => navigate("/admin/dashboard")}
-          >
+          <button className="dashboard" onClick={() => navigate("/admin/dashboard")}>
             Go to Dashboard
           </button>
-          <button
-            className="dashboard"
-            style={{ marginLeft: "10px" }}
-            onClick={() => navigate("/admin/qr-code")}
-          >
+          <button className="dashboard" style={{ marginLeft: "10px" }} onClick={() => navigate("/admin/qr-code")}>
             Get Your QR Code
           </button>
         </div>

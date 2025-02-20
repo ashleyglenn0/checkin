@@ -1,51 +1,42 @@
-import React, { useState, useEffect } from "react";
+import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
 import "../styles/qrstyles.css";
 
-const AdminQRCode = () => {
-  const [adminInfo, setAdminInfo] = useState(null);
-  const [showQR, setShowQR] = useState(false);
+const AdminQRPage = () => {
   const navigate = useNavigate();
+  const [adminInfo, setAdminInfo] = useState(null);
 
   useEffect(() => {
     const storedAdmin = JSON.parse(localStorage.getItem("adminInfo"));
-    if (storedAdmin) {
+    if (storedAdmin?.role === "admin") {
       setAdminInfo(storedAdmin);
     } else {
-      alert("⚠️ No admin info found. Please check in first.");
-      navigate("/"); // Redirect to check-in if no admin info
+      alert("⚠️ No admin found. Please check in as an admin first.");
+      navigate("/admin/check-in");
     }
   }, [navigate]);
 
-  const appUrl = "https://volunteercheckin-3659e.web.app/admin/checkin";
+  if (!adminInfo) return null;
+
+  const volunteerCheckInUrl = "https://volunteercheckin-3659e.web.app/";
+  const qrValue = `${volunteerCheckInUrl}?staff=${encodeURIComponent(
+    `${adminInfo.firstName} ${adminInfo.lastName}`
+  )}`;
 
   return (
-    <div className="qr-page-container">
-      {adminInfo && (
-        <>
-          <h2>Welcome, {adminInfo.firstName} {adminInfo.lastName}</h2>
-          <p><strong>Role:</strong> Admin</p>
-
-          {!showQR ? (
-            <button onClick={() => setShowQR(true)}>Get Your QR Code</button>
-          ) : (
-            <>
-              <div className="qr-code-container">
-                <QRCodeCanvas
-                  value={`${appUrl}?admin=${encodeURIComponent(`${adminInfo.firstName} ${adminInfo.lastName}`)}`}
-                  size={200}
-                  level="H"
-                />
-                <p>Scan this code to access the Admin Dashboard</p>
-              </div>
-              <button onClick={() => navigate("/")}>Back to Check-In</button>
-            </>
-          )}
-        </>
-      )}
+    <div className="qr-page-container render-event">
+      <h2>Welcome, {adminInfo.firstName} {adminInfo.lastName}</h2>
+      <p><strong>Event:</strong> {adminInfo.event || "Render"}</p>
+      <div className="qr-code-container">
+        <QRCodeCanvas value={qrValue} size={220} level="H" />
+        <p>Scan this code to check volunteers in/out.</p>
+      </div>
+      <button onClick={() => navigate("/admin/checkin")}>
+        Back to Check-In
+      </button>
     </div>
   );
 };
 
-export default AdminQRCode;
+export default AdminQRPage;

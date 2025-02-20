@@ -103,7 +103,7 @@ const Dashboard = () => {
 
       {/* ✅ Navigation Buttons */}
       <div className="dashboard-buttons">
-        <button onClick={() => navigate("/")}>🔙 Back to Check-In</button>
+        <button onClick={() => navigate("/admin/checkin")}>🔙 Back to Check-In</button>
         <button className="toggle-button dashboard-buttons" onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
           Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
         </button>

@@ -236,7 +236,7 @@ const Reports = () => {
 
       {/* ✅ Navigation Buttons */}
       <div className="reports-buttons">
-        <button onClick={() => navigate("/dashboard")}>
+        <button onClick={() => navigate("/admin/dashboard")}>
           ⬅ Back to Dashboard
         </button>
         <button

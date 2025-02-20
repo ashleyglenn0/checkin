@@ -67,7 +67,7 @@ const Schedule = () => {
       </table>
 
       <div className="schedule-buttons">
-        <button onClick={() => navigate("/dashboard")}>⬅ Back to Dashboard</button>
+        <button onClick={() => navigate("/admin/dashboard")}>⬅ Back to Dashboard</button>
         <button className="export-button">📤 Export to Google Sheets</button>
       </div>
     </div>
