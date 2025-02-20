@@ -1,0 +1,94 @@
+/* qrstyles.css */
+
+.qr-page-container {
+  max-width: 400px;
+  margin: 0 auto;
+  padding: 20px;
+  background-color: #fdf0e2;
+  border-radius: 10px;
+  box-shadow: 0 4px 8px rgba(0, 0, 0, 0.1);
+  text-align: center;
+}
+
+.qr-page-container h2 {
+  margin-bottom: 10px;
+  font-size: 24px;
+}
+
+.qr-page-container p {
+  margin: 8px 0;
+}
+
+.qr-page-container button {
+  margin-top: 15px;
+  padding: 10px 20px;
+  background-color: #fe88df;
+  border: none;
+  color: #711b44;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.qr-code-container {
+  margin-top: 20px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.qr-code-container canvas {
+  width: 100%;
+  max-width: 250px;
+  height: auto;
+}
+
+/* ATL Tech Week (teal theme) */
+.qr-page-container.atl-tech-week {
+  background-color: #e0f7f6;
+}
+
+.qr-page-container.atl-tech-week button {
+  background-color: #009688;
+  color: white;
+}
+.button-group {
+  display: flex;
+  justify-content: space-between;
+  margin-top: 20px;
+}
+
+.button-group button {
+  flex: 1;
+  margin: 0 5px;
+  padding: 10px;
+  border: none;
+  border-radius: 5px;
+  cursor: pointer;
+}
+
+.qr-page-container.atl-tech-week .button-group button {
+  background-color: #00796b;
+  color: white;
+}
+
+.qr-page-container.render .button-group button {
+  background-color: #fe88df;
+  color: #711b44;
+}
+
+/* Responsive adjustments */
+@media (max-width: 480px) {
+  .qr-code-container {
+    width: 90%;
+    padding: 15px;
+  }
+
+  .qr-code-container h2 {
+    font-size: 1.4rem;
+  }
+
+  .qr-code-container button {
+    width: 100%;
+    font-size: 0.9rem;
+  }
+}

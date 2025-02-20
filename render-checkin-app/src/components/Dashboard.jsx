@@ -1,8 +1,7 @@
 import React, { useState, useEffect } from "react";
 import { useNavigate, Link } from "react-router-dom";
 import { db } from "../config/firebaseConfig";
-import { collection, query, where, onSnapshot } from "firebase/firestore";
-import { Timestamp } from "firebase/firestore"; // ✅ Import Firestore Timestamp
+import { collection, query, where, onSnapshot, Timestamp } from "firebase/firestore";
 import "../styles/dashboardstyles.css";
 
 const Dashboard = () => {
@@ -16,23 +15,37 @@ const Dashboard = () => {
   const [scheduledVolunteers, setScheduledVolunteers] = useState([]);
   const navigate = useNavigate();
 
+  // ✅ Generate upcoming 7-day options
+  const upcomingDates = Array.from({ length: 7 }, (_, i) => {
+    const date = new Date();
+    date.setUTCDate(date.getUTCDate() + i); // Ensure UTC dates
+    return date;
+  });
+
   useEffect(() => {
     localStorage.setItem("isAtlTechWeek", JSON.stringify(isAtlTechWeek));
   }, [isAtlTechWeek]);
 
   useEffect(() => {
-    const startOfDay = new Date(selectedDate);
-    startOfDay.setHours(0, 0, 0, 0);
-    const endOfDay = new Date(selectedDate);
-    endOfDay.setHours(23, 59, 59, 999);
+    const startOfDayUTC = new Date(Date.UTC(
+      selectedDate.getUTCFullYear(),
+      selectedDate.getUTCMonth(),
+      selectedDate.getUTCDate(),
+      0, 0, 0, 0
+    ));
 
-    console.log(`📅 Fetching data for: ${selectedDate.toDateString()}`);
+    const endOfDayUTC = new Date(Date.UTC(
+      selectedDate.getUTCFullYear(),
+      selectedDate.getUTCMonth(),
+      selectedDate.getUTCDate(),
+      23, 59, 59, 999
+    ));
 
-    // ✅ Convert to Firestore Timestamp
-    const startTimestamp = Timestamp.fromDate(startOfDay);
-    const endTimestamp = Timestamp.fromDate(endOfDay);
+    const startTimestamp = Timestamp.fromDate(startOfDayUTC);
+    const endTimestamp = Timestamp.fromDate(endOfDayUTC);
 
-    // ✅ Real-Time Check-Ins Listener
+    console.log(`📅 Fetching data for: ${selectedDate.toISOString().split("T")[0]}`);
+
     const checkInsQuery = query(
       collection(db, "check_ins"),
       where("timestamp", ">=", startTimestamp),
@@ -40,13 +53,11 @@ const Dashboard = () => {
       where("status", "==", "Checked In"),
       where("isAtlTechWeek", "==", isAtlTechWeek)
     );
+
     const unsubscribeCheckIns = onSnapshot(checkInsQuery, (snapshot) => {
-      const data = snapshot.docs.map((doc) => doc.data());
-      console.log("🔥 Updated Check-Ins Data:", data);
-      setCheckIns(data);
+      setCheckIns(snapshot.docs.map((doc) => doc.data()));
     });
 
-    // ✅ Real-Time Check-Outs Listener
     const checkOutsQuery = query(
       collection(db, "check_ins"),
       where("timestamp", ">=", startTimestamp),
@@ -54,25 +65,26 @@ const Dashboard = () => {
       where("status", "==", "Checked Out"),
       where("isAtlTechWeek", "==", isAtlTechWeek)
     );
+
     const unsubscribeCheckOuts = onSnapshot(checkOutsQuery, (snapshot) => {
       setCheckOuts(snapshot.docs.map((doc) => doc.data()));
     });
 
-    // ✅ Real-Time Scheduled Volunteers Listener
     const scheduledQuery = query(
       collection(db, "scheduled_volunteers"),
-      where("date", "==", selectedDate.toISOString().split("T")[0]), // Keep this as a string since it's not a timestamp
+      where("date", "==", selectedDate.toISOString().split("T")[0]),
       where("isAtlTechWeek", "==", isAtlTechWeek)
     );
+
     const unsubscribeScheduled = onSnapshot(scheduledQuery, (snapshot) => {
       const scheduledList = snapshot.docs.map((doc) => doc.data());
       setScheduledVolunteers(scheduledList);
 
-      // ✅ Calculate No-Shows
       const noShowsList = scheduledList.filter((scheduled) =>
-        !checkIns.some((checkedIn) =>
-          checkedIn.first_name === scheduled.first_name &&
-          checkedIn.last_name === scheduled.last_name
+        !checkIns.some(
+          (checkedIn) =>
+            checkedIn.first_name === scheduled.first_name &&
+            checkedIn.last_name === scheduled.last_name
         )
       );
       setNoShows(noShowsList);
@@ -83,87 +95,78 @@ const Dashboard = () => {
       unsubscribeCheckOuts();
       unsubscribeScheduled();
     };
-  }, [selectedDate, isAtlTechWeek]);
+  }, [selectedDate, isAtlTechWeek, checkIns]);
 
   return (
     <div className={`dashboard-container ${isAtlTechWeek ? "atl-tech-week" : "render"}`}>
       <h1>{isAtlTechWeek ? "ATL Tech Week Dashboard" : "Render Dashboard"}</h1>
 
-      {/* ✅ Buttons moved to the top */}
+      {/* ✅ Navigation Buttons */}
       <div className="dashboard-buttons">
         <button onClick={() => navigate("/")}>🔙 Back to Check-In</button>
         <button className="toggle-button dashboard-buttons" onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
           Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
         </button>
-        <button onClick={() => navigate("/schedule")}>📅 View Schedule</button>
-        <button onClick={() => navigate("/reports")}>📊 View Reports</button>
-        <Link to="/qr-scanner">
-        <button>Scan QR Code</button>
-      </Link>
-      <Link to="/task-dashboard">
-        <button>View Task Dashboard</button>
-      </Link>
+        <button onClick={() => navigate("/admin/schedule")}>📅 View Schedule</button>
+        <button onClick={() => navigate("/admin/reports")}>📊 View Reports</button>
+        <Link to="/admin/task-dashboard">
+          <button>View Task Dashboard</button>
+        </Link>
       </div>
 
-      {/* 🔹 Date Picker for Viewing Past Check-Ins */}
+      {/* 🔹 Dropdown Date Picker */}
       <label>Select Date:</label>
-      <input
-        type="date"
+      <select
         value={selectedDate.toISOString().split("T")[0]}
-        onChange={(e) => setSelectedDate(new Date(e.target.value))}
-      />
+        onChange={(e) => {
+          const [year, month, day] = e.target.value.split("-");
+          setSelectedDate(new Date(Date.UTC(year, month - 1, day))); // Ensure UTC consistency
+        }}
+      >
+        {upcomingDates.map((date, index) => (
+          <option key={index} value={date.toISOString().split("T")[0]}>
+            {date.toLocaleDateString("en-US", { weekday: "long", month: "long", day: "numeric" })}
+          </option>
+        ))}
+      </select>
 
-      {/* ✅ Check-Ins Section */}
+      {/* ✅ Checked-In Volunteers */}
       <div className="dashboard-section">
-        <h2>✅ Checked-In Volunteers ({selectedDate.toISOString().split("T")[0]})</h2>
-        <ul>
-          {checkIns.length > 0 ? (
-            checkIns.map((volunteer, index) => (
-              <li key={index}>{volunteer.first_name} {volunteer.last_name}</li>
-            ))
-          ) : (
-            <p>No check-ins yet.</p>
-          )}
-        </ul>
+        <h2>✅ Checked-In Volunteers ({selectedDate.toLocaleDateString("en-US", { timeZone: "UTC" })})</h2>
+        {checkIns.length > 0 ? (
+          <ul>{checkIns.map((v, i) => <li key={i}>{v.first_name} {v.last_name}</li>)}</ul>
+        ) : (
+          <p>No check-ins yet.</p>
+        )}
       </div>
 
-      {/* ✅ Check-Outs Section */}
+      {/* ✅ Checked-Out Volunteers */}
       <div className="dashboard-section">
-        <h2>📤 Checked-Out Volunteers ({selectedDate.toISOString().split("T")[0]})</h2>
-        <ul>
-          {checkOuts.length > 0 ? (
-            checkOuts.map((volunteer, index) => (
-              <li key={index}>{volunteer.first_name} {volunteer.last_name}</li>
-            ))
-          ) : (
-            <p>No check-outs yet.</p>
-          )}
-        </ul>
+        <h2>📤 Checked-Out Volunteers ({selectedDate.toLocaleDateString("en-US", { timeZone: "UTC" })})</h2>
+        {checkOuts.length > 0 ? (
+          <ul>{checkOuts.map((v, i) => <li key={i}>{v.first_name} {v.last_name}</li>)}</ul>
+        ) : (
+          <p>No check-outs yet.</p>
+        )}
       </div>
 
-      {/* ✅ No Shows Section */}
+      {/* ✅ No Shows */}
       <div className="dashboard-section">
         <h2>❌ No Shows ({selectedDate.toISOString().split("T")[0]})</h2>
-        <ul>
-          {noShows.length > 0 ? (
-            noShows.map((volunteer, index) => (
-              <li key={index}>{volunteer.first_name} {volunteer.last_name}</li>
-            ))
-          ) : (
-            <p>No no-shows detected.</p>
-          )}
-        </ul>
+        {noShows.length > 0 ? (
+          <ul>{noShows.map((v, i) => <li key={i}>{v.first_name} {v.last_name}</li>)}</ul>
+        ) : (
+          <p>No no-shows detected.</p>
+        )}
       </div>
 
-      {/* ✅ Scheduled Volunteers Section (Optional) */}
+      {/* ✅ Scheduled Volunteers */}
       {scheduledVolunteers.length > 0 && (
         <div className="dashboard-section">
           <h2>📅 Scheduled Volunteers ({selectedDate.toISOString().split("T")[0]})</h2>
           <ul>
-            {scheduledVolunteers.map((volunteer, index) => (
-              <li key={index}>
-                {volunteer.first_name} {volunteer.last_name} - {volunteer.shift}
-              </li>
+            {scheduledVolunteers.map((v, i) => (
+              <li key={i}>{v.first_name} {v.last_name} - {v.shift}</li>
             ))}
           </ul>
         </div>

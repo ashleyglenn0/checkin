@@ -6,8 +6,10 @@ import Reports from "./components/Reports";
 import Schedule from "./components/Schedule";
 import ThemePreview from "./components/ThemePreview";
 import TaskCheckInForm from "./components/TaskCheckInForm";
-import QRScanner from "./components/QRScanner";
 import TaskDashboard from "./components/TaskDashboard";
+import AdminQRCode from "./components/AdminQRCodePage";
+import TeamLeadQRPage from "./components/TeamLeadQRPage";
+import RoleBasedAccess from "./components/RoleBasedAccess";
 
 const App = () => {
   useEffect(() => {
@@ -50,17 +52,23 @@ const App = () => {
     <Router>
       <Routes>
         <Route path="/" element={<CheckInForm />} />
-        <Route path="/dashboard" element={<Dashboard />} />
-        <Route path="/reports" element={<Reports />} />
-        <Route path="/schedule" element={<Schedule />} />
         <Route path="/theme-preview" element={<ThemePreview />} />
         <Route path="/task-check-in" element={<TaskCheckInForm />} />
-        <Route path="/qr-scanner" element={<QRScanner />} />
-        <Route path="/task-dashboard" element={<TaskDashboard />} />
+
+        <Route path="/teamlead-qr" element={<TeamLeadQRPage />} />
+        <Route path="/teamlead/task-checkin" element={<TaskCheckInForm />} />
+
+        <Route element={<RoleBasedAccess allowedRoles={["admin"]} />}>
+          <Route path="/admin/checkin" element={<CheckInForm/>} />
+          <Route path="/admin/dashboard" element={<Dashboard />} />
+          <Route path="/admin/qr-code" element={<AdminQRCode />} />
+          <Route path="/admin/reports" element={<Reports />} />
+          <Route path="/admin/schedule" element={<Schedule />} />
+          <Route path="/admin/task-dashboard" element={<TaskDashboard />} />
+        </Route>
       </Routes>
     </Router>
   );
 };
 
 export default App;
-
