@@ -1,264 +1,202 @@
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { db } from "../config/firebaseConfig";
+import { collection, query, where, getDocs } from "firebase/firestore";
+import { Timestamp } from "firebase/firestore";
+import { CSVLink } from "react-csv";
 import "../styles/reportstyles.css";
 
-const RENDER_SHEET_ID = import.meta.env.REACT_APP_RENDER_SHEET_ID; // Render Spreadsheet ID
-const ATL_SHEET_ID = import.meta.env.REACT_APP_ATL_SHEET_ID;// ATL Tech Week Spreadsheet ID
-
 const Reports = () => {
+  const [activeTab, setActiveTab] = useState("check-ins");
+  const [selectedDate, setSelectedDate] = useState(new Date());
+  const [checkIns, setCheckIns] = useState([]);
+  const [checkOuts, setCheckOuts] = useState([]);
+  const [noShows, setNoShows] = useState([]);
+  const [roleDistribution, setRoleDistribution] = useState([]);
+  const [shiftCoverage, setShiftCoverage] = useState([]);
   const [isAtlTechWeek, setIsAtlTechWeek] = useState(
     JSON.parse(localStorage.getItem("isAtlTechWeek")) || false
   );
 
-  useEffect(() => {
-    localStorage.setItem("isAtlTechWeek", JSON.stringify(isAtlTechWeek));
-  }, [isAtlTechWeek]);
-
-  const handleExport = async (reportType) => {
-    let data, sheetName;
-  
-    // Use correct data & sheet names
-    if (reportType === "check-ins") {
-      data = checkIns;
-      sheetName = isAtlTechWeek ? "ATL Check-Ins" : "Check-Ins";
-    } else if (reportType === "check-outs") {
-      data = checkOuts;
-      sheetName = isAtlTechWeek ? "ATL Check-Outs" : "Check-Outs";
-    } else if (reportType === "no-shows") {
-      data = noShows;
-      sheetName = isAtlTechWeek ? "ATL No-Shows" : "No-Shows";
-    }
-  
-    // Pick the correct Google Sheet ID based on event type
-    const SHEET_ID = isAtlTechWeek ? ATL_SHEET_ID : RENDER_SHEET_ID;
-  
-    console.log("📤 Sending Export Request:", {
-      data,
-      sheetId: SHEET_ID,
-      sheetName,
+  const generateNextSevenDays = () => {
+    return Array.from({ length: 7 }, (_, i) => {
+      const date = new Date();
+      date.setDate(date.getDate() + i);
+      return date;
     });
-  
-    // 🛠 Make the API request to the backend
-    try {
-      const response = await fetch("http://localhost:5001/export", {
-        method: "POST",
-        headers: {
-          "Content-Type": "application/json",
-        },
-        body: JSON.stringify({ data, sheetId: SHEET_ID, sheetName }),
-      });
-  
-      const result = await response.json();
-  
-      if (!response.ok) {
-        throw new Error(result.error || "Export failed.");
-      }
-  
-      console.log("✅ Export successful:", result.sheetUrl);
-      alert(`✅ ${reportType} exported! View it here: ${result.sheetUrl}`);
-      window.open(result.sheetUrl, "_blank");
-    } catch (error) {
-      console.error("❌ Export failed:", error);
-      alert(`❌ Export failed. ${error.message}`);
+  };
+
+  const fetchData = async () => {
+    const startOfDay = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate(),
+      0, 0, 0, 0
+    );
+    const endOfDay = new Date(
+      selectedDate.getFullYear(),
+      selectedDate.getMonth(),
+      selectedDate.getDate(),
+      23, 59, 59, 999
+    );
+
+    const startTimestamp = Timestamp.fromDate(startOfDay);
+    const endTimestamp = Timestamp.fromDate(endOfDay);
+
+    const mapData = (docs) =>
+      docs.map((doc) => ({
+        "Last Name": doc.last_name,
+        "First Name": doc.first_name,
+        "Staff QR": doc.staff_qr,
+        Status: doc.status,
+        "ATL Tech Week": doc.isAtlTechWeek ? "Yes" : "No",
+        "Date of Check-In": new Date(doc.timestamp.toDate()).toLocaleDateString(),
+        Timestamp: new Date(doc.timestamp.toDate()).toLocaleTimeString(),
+      }));
+
+    // Queries
+    const [checkInsSnapshot, checkOutsSnapshot, scheduledSnapshot, volunteersSnapshot] = await Promise.all([
+      getDocs(query(
+        collection(db, "check_ins"),
+        where("timestamp", ">=", startTimestamp),
+        where("timestamp", "<=", endTimestamp),
+        where("status", "==", "Checked In"),
+        where("isAtlTechWeek", "==", isAtlTechWeek)
+      )),
+      getDocs(query(
+        collection(db, "check_ins"),
+        where("timestamp", ">=", startTimestamp),
+        where("timestamp", "<=", endTimestamp),
+        where("status", "==", "Checked Out"),
+        where("isAtlTechWeek", "==", isAtlTechWeek)
+      )),
+      getDocs(query(
+        collection(db, "scheduled_volunteers"),
+        where("date", "==", selectedDate.toISOString().split("T")[0]),
+        where("isAtlTechWeek", "==", isAtlTechWeek)
+      )),
+      getDocs(collection(db, "volunteers")),
+    ]);
+
+    const fetchedCheckIns = checkInsSnapshot.docs.map((doc) => doc.data());
+    const fetchedCheckOuts = checkOutsSnapshot.docs.map((doc) => doc.data());
+    const scheduled = scheduledSnapshot.docs.map((doc) => doc.data());
+    const volunteers = volunteersSnapshot.docs.map((doc) => doc.data());
+
+    const fetchedNoShows = scheduled.filter(
+      (vol) => !fetchedCheckIns.some(
+        (checkIn) => checkIn.first_name === vol.first_name && checkIn.last_name === vol.last_name
+      )
+    );
+
+    setCheckIns(mapData(fetchedCheckIns));
+    setCheckOuts(mapData(fetchedCheckOuts));
+    setNoShows(fetchedNoShows.map((vol) => ({
+      "Last Name": vol.last_name,
+      "First Name": vol.first_name,
+      "ATL Tech Week": vol.isAtlTechWeek ? "Yes" : "No",
+      "Date of Scheduled Shift": vol.date,
+    })));
+
+    // Volunteer Role Distribution
+    const roleCounts = volunteers.reduce((acc, { role }) => {
+      acc[role] = (acc[role] || 0) + 1;
+      return acc;
+    }, {});
+    setRoleDistribution(Object.entries(roleCounts).map(([role, count]) => ({ Role: role, Count: count })));
+
+    // Shift Coverage vs Need
+    const shiftData = scheduled.reduce((acc, { shift }) => {
+      const checkInCount = fetchedCheckIns.filter((checkIn) => checkIn.shift === shift).length;
+      acc[shift] = acc[shift] || { Shift: shift, Scheduled: 0, "Checked In": 0 };
+      acc[shift].Scheduled += 1;
+      acc[shift]["Checked In"] = checkInCount;
+      return acc;
+    }, {});
+    setShiftCoverage(Object.values(shiftData));
+  };
+
+  useEffect(() => {
+    fetchData();
+  }, [selectedDate, isAtlTechWeek]);
+
+  const dateOptions = generateNextSevenDays();
+
+  const renderTable = (data) => (
+    <table className="reports-table">
+      <thead>
+        <tr>{data.length > 0 && Object.keys(data[0]).map((key) => <th key={key}>{key}</th>)}</tr>
+      </thead>
+      <tbody>
+        {data.length > 0 ? (
+          data.map((row, index) => (
+            <tr key={index}>
+              {Object.values(row).map((value, idx) => <td key={idx}>{value}</td>)}
+            </tr>
+          ))
+        ) : (
+          <tr><td colSpan="100%">No data available.</td></tr>
+        )}
+      </tbody>
+    </table>
+  );
+
+  const getCurrentTabData = () => {
+    switch (activeTab) {
+      case "check-ins": return checkIns;
+      case "check-outs": return checkOuts;
+      case "no-shows": return noShows;
+      case "role-distribution": return roleDistribution;
+      case "shift-coverage": return shiftCoverage;
+      default: return [];
     }
   };
 
-  // Dummy Data for Render
-  const renderCheckIns = [
-    {
-      first_name: "Ashley",
-      last_name: "Glenn",
-      timestamp: "2025-02-12T09:30:00Z",
-    },
-    {
-      first_name: "Mikal",
-      last_name: "Johnson",
-      timestamp: "2025-02-12T10:15:00Z",
-    },
-  ];
-
-  const renderCheckOuts = [
-    {
-      first_name: "Ashley",
-      last_name: "Glenn",
-      timestamp: "2025-02-12T17:00:00Z",
-    },
-  ];
-
-  const renderNoShows = [{ first_name: "Reba", last_name: "Smith" }];
-
-  const renderVolunteers = [
-    { first_name: "Ashley", last_name: "Glenn", role: "Team Lead" },
-    { first_name: "Mikal", last_name: "Johnson", role: "Check-In Lead" },
-    { first_name: "Reba", last_name: "Smith", role: "Volunteer" },
-  ];
-
-  // Dummy Data for ATL Tech Week
-  const atlCheckIns = [
-    {
-      first_name: "Jordan",
-      last_name: "Smith",
-      timestamp: "2025-02-12T10:00:00Z",
-    },
-    {
-      first_name: "Taylor",
-      last_name: "Johnson",
-      timestamp: "2025-02-12T11:30:00Z",
-    },
-  ];
-
-  const atlCheckOuts = [
-    {
-      first_name: "Jordan",
-      last_name: "Smith",
-      timestamp: "2025-02-12T18:00:00Z",
-    },
-  ];
-
-  const atlNoShows = [{ first_name: "Morgan", last_name: "Lee" }];
-
-  const atlVolunteers = [
-    { first_name: "Jordan", last_name: "Smith", role: "Volunteer" },
-    { first_name: "Taylor", last_name: "Johnson", role: "Check-In Lead" },
-    { first_name: "Morgan", last_name: "Lee", role: "Volunteer" },
-  ];
-
-  // Switch between Render & ATL Tech Week data
-  const checkIns = isAtlTechWeek ? atlCheckIns : renderCheckIns;
-  const checkOuts = isAtlTechWeek ? atlCheckOuts : renderCheckOuts;
-  const noShows = isAtlTechWeek ? atlNoShows : renderNoShows;
-  const allVolunteers = isAtlTechWeek ? atlVolunteers : renderVolunteers;
-
-  const navigate = useNavigate();
-
   return (
-    <div
-      className={`reports-container ${
-        isAtlTechWeek ? "atl-tech-week" : "render"
-      }`}
-    >
+    <div className={`reports-container ${isAtlTechWeek ? "atl-tech-week" : "render"}`}>
       <h1>{isAtlTechWeek ? "ATL Tech Week Reports" : "Render Reports"}</h1>
 
-      {/* ✅ Toggle Button */}
-      <button
-        className="toggle-button"
-        onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}
-      >
-        Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
-      </button>
-
-      {/* ✅ Reports Sections */}
-      <div className="reports-section">
-        <h2>✅ Checked-In Volunteers</h2>
-        <table className="reports-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {checkIns.length > 0 ? (
-              checkIns.map((volunteer, index) => (
-                <tr key={index}>
-                  <td>
-                    {volunteer.first_name} {volunteer.last_name}
-                  </td>
-                  <td>{new Date(volunteer.timestamp).toLocaleTimeString()}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="2">No check-ins yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="reports-section">
-        <h2>📤 Checked-Out Volunteers</h2>
-        <table className="reports-table">
-          <thead>
-            <tr>
-              <th>Name</th>
-              <th>Time</th>
-            </tr>
-          </thead>
-          <tbody>
-            {checkOuts.length > 0 ? (
-              checkOuts.map((volunteer, index) => (
-                <tr key={index}>
-                  <td>
-                    {volunteer.first_name} {volunteer.last_name}
-                  </td>
-                  <td>{new Date(volunteer.timestamp).toLocaleTimeString()}</td>
-                </tr>
-              ))
-            ) : (
-              <tr>
-                <td colSpan="2">No check-outs yet.</td>
-              </tr>
-            )}
-          </tbody>
-        </table>
-      </div>
-
-      <div className="reports-section">
-        <h2>❌ No Shows</h2>
-        <ul>
-          {noShows.length > 0 ? (
-            noShows.map((volunteer, index) => (
-              <li key={index}>
-                {volunteer.first_name} {volunteer.last_name}
-              </li>
-            ))
-          ) : (
-            <p>No no-shows detected.</p>
-          )}
-        </ul>
-      </div>
-
-      <div className="reports-section">
-        <h2>📋 All Volunteers</h2>
-        <ul>
-          {allVolunteers.length > 0 ? (
-            allVolunteers.map((volunteer, index) => (
-              <li key={index}>
-                {volunteer.first_name} {volunteer.last_name} - {volunteer.role}
-              </li>
-            ))
-          ) : (
-            <p>No volunteers available.</p>
-          )}
-        </ul>
-      </div>
-
-      {/* ✅ Navigation Buttons */}
-      <div className="reports-buttons">
-        <button onClick={() => navigate("/admin/dashboard")}>
-          ⬅ Back to Dashboard
-        </button>
-        <button
-          className="export-button"
-          onClick={() => handleExport("check-ins")}
+      <div className="reports-controls">
+        <label>Select Date:</label>
+        <select
+          value={selectedDate.toISOString().split("T")[0]}
+          onChange={(e) => setSelectedDate(new Date(e.target.value))}
         >
-          📤 Export Check-Ins
+          {dateOptions.map((date) => (
+            <option key={date.toISOString()} value={date.toISOString().split("T")[0]}>
+              {date.toLocaleDateString()}
+            </option>
+          ))}
+        </select>
+        <button onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
+          Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
         </button>
+      </div>
 
-        <button
-          className="export-button"
-          onClick={() => handleExport("check-outs")}
-        >
-          📤 Export Check-Outs
-        </button>
+      {/* Tabs */}
+      <div className="tabs">
+        {["check-ins", "check-outs", "no-shows", "role-distribution", "shift-coverage"].map((tab) => (
+          <button
+            key={tab}
+            className={`tab-button ${activeTab === tab ? "active" : ""}`}
+            onClick={() => setActiveTab(tab)}
+          >
+            {tab.replace("-", " ").toUpperCase()}
+          </button>
+        ))}
+      </div>
 
-        <button
+      {/* Data Table */}
+      <div className="reports-section">{renderTable(getCurrentTabData())}</div>
+
+      {/* CSV Export */}
+      <div className="export-button-container">
+        <CSVLink
+          data={getCurrentTabData()}
+          filename={`${activeTab}_${selectedDate.toISOString().split("T")[0]}.csv`}
           className="export-button"
-          onClick={() => handleExport("no-shows")}
         >
-          📤 Export No-Shows
-        </button>
+          📤 Export {activeTab.replace("-", " ")} CSV
+        </CSVLink>
       </div>
     </div>
   );
