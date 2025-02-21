@@ -42,7 +42,7 @@ const TeamLeadQRPage = () => {
     fetchTeamLeadInfo();
   }, [db, firstName, lastName, searchParams]);
 
-  const appUrl = "https://volunteercheckin-3659e.web.app/task-checkin";
+  const appUrl = "https://volunteercheckin-3659e.web.app/task-check-in";
 
   console.log("URL Parameters:", {
     firstName: searchParams.get("firstName"),

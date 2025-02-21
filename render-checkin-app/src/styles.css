@@ -112,3 +112,22 @@ button.dashboard:hover {
   text-align: center;
 }
 
+.qr-link-popup {
+  background-color: #FDF0E2;
+  border: 2px solid #FE88DF;
+  padding: 16px;
+  text-align: center;
+  border-radius: 8px;
+  margin-top: 20px;
+}
+
+.qr-link-popup button {
+  background-color: #FE88DF;
+  border: none;
+  padding: 10px;
+  color: white;
+  cursor: pointer;
+  margin-top: 10px;
+}
+
+

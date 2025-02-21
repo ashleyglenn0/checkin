@@ -1,5 +1,8 @@
 {
   "projects": {
-    "default": "volunteercheckin-3659e"
-  }
+    "default": "volunteercheckin-3659e",
+    "prod": "volunteercheckin-3659e"
+  },
+  "targets": {},
+  "etags": {}
 }

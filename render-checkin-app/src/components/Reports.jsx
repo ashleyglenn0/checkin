@@ -3,6 +3,7 @@ import { db } from "../config/firebaseConfig";
 import { collection, query, where, getDocs } from "firebase/firestore";
 import { Timestamp } from "firebase/firestore";
 import { CSVLink } from "react-csv";
+import { useNavigate } from "react-router-dom";
 import "../styles/reportstyles.css";
 
 const Reports = () => {
@@ -16,6 +17,7 @@ const Reports = () => {
   const [isAtlTechWeek, setIsAtlTechWeek] = useState(
     JSON.parse(localStorage.getItem("isAtlTechWeek")) || false
   );
+  const navigate = useNavigate();
 
   const generateNextSevenDays = () => {
     return Array.from({ length: 7 }, (_, i) => {
@@ -197,6 +199,7 @@ const Reports = () => {
         >
           📤 Export {activeTab.replace("-", " ")} CSV
         </CSVLink>
+        <button onClick={() => navigate("/admin/dashboard")}>⬅ Back to Dashboard</button>
       </div>
     </div>
   );

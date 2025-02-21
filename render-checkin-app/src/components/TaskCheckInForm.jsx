@@ -2,14 +2,14 @@ import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate, useLocation } from "react-router-dom";
 import {
   getFirestore,
-  doc,
-  getDoc,
-  setDoc,
   collection,
   query,
   where,
   getDocs,
+  doc,
+  setDoc,
   updateDoc,
+  Timestamp,
 } from "firebase/firestore";
 import "../styles/taskcheckinstyles.css";
 
@@ -18,6 +18,7 @@ const TaskCheckInForm = () => {
   const location = useLocation();
   const isTeamLeadPath = location.pathname.includes("/teamlead");
   const navigate = useNavigate();
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [task, setTask] = useState("");
@@ -32,50 +33,58 @@ const TaskCheckInForm = () => {
     setTask(searchParams.get("task") || "");
     setTeamLead(searchParams.get("teamLead") || "");
     setEvent(searchParams.get("event") || "");
-    setShowBackButton(searchParams.get("manual") === "true"); // Show back button if 'manual=true' is in the URL
+    setShowBackButton(searchParams.get("manual") === "true");
   }, [searchParams]);
 
-  const verifyAdminCheckIn = async (first, last) => {
-    const today = new Date().toISOString().split("T")[0];
-    const checkInsRef = collection(db, "check_ins");
+  const verifyAdminCheckIn = async (first, last, minWaitMinutes = 1) => {
+    const startOfDay = Timestamp.fromDate(new Date(new Date().setHours(0, 0, 0, 0)));
+    const endOfDay = Timestamp.fromDate(new Date(new Date().setHours(23, 59, 59, 999)));
+
     const q = query(
-      checkInsRef,
+      collection(db, "check_ins"),
       where("first_name", "==", first),
       where("last_name", "==", last),
       where("status", "==", "Checked In"),
-      where("timestamp", ">=", today)
+      where("timestamp", ">=", startOfDay),
+      where("timestamp", "<=", endOfDay)
     );
 
-    const querySnapshot = await getDocs(q);
-    return !querySnapshot.empty; // Returns true if checked in by an admin
+    const snapshot = await getDocs(q);
+
+    if (snapshot.empty) {
+      return { allowed: false, message: "⚠️ No admin check-in found for today." };
+    }
+
+    const checkInTime = snapshot.docs[0].data().timestamp.toDate();
+    const currentTime = new Date();
+    const timeDifferenceMinutes = (currentTime - checkInTime) / 60000; // ms to minutes
+
+    if (timeDifferenceMinutes < minWaitMinutes) {
+      return {
+        allowed: false,
+        message: `⚠️ Please wait ${Math.ceil(minWaitMinutes - timeDifferenceMinutes)} more minute(s) before checking in with the team lead while the system updates.`,
+      };
+    }
+
+    return { allowed: true };
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
     setError(null);
-    const timestamp = new Date().toISOString();
-  
+
     try {
-      const isCheckedIn = await verifyAdminCheckIn(firstName, lastName);
-      if (!isCheckedIn) {
-        setError("⚠️ This volunteer has not checked in with an admin and cannot check into a task.");
+      const { allowed, message } = await verifyAdminCheckIn(firstName, lastName, 1);
+      if (!allowed) {
+        setError(message);
         return;
       }
-  
-      const volunteerDocRef = doc(db, "volunteers", `${firstName}_${lastName}`.toLowerCase());
-      const volunteerDoc = await getDoc(volunteerDocRef);
-  
-      if (volunteerDoc.exists()) {
-        const currentTask = volunteerDoc.data().currentTask;
-        if (currentTask?.id && currentTask.task !== task) {
-          await updateDoc(doc(db, "task_checkins", currentTask.id), {
-            checkoutTime: timestamp,
-          });
-        }
-      }
-  
-      const newTaskCheckinRef = doc(db, "task_checkins", `${firstName}_${lastName}_${timestamp}`);
-      await setDoc(newTaskCheckinRef, {
+
+      const timestamp = new Date().toISOString();
+
+      // ✅ Create or update task_checkins record
+      const taskCheckinId = `${firstName}_${lastName}_${timestamp}`;
+      await setDoc(doc(db, "task_checkins", taskCheckinId), {
         first_name: firstName,
         last_name: lastName,
         task,
@@ -84,22 +93,14 @@ const TaskCheckInForm = () => {
         teamLead,
         event,
       });
-  
-      await setDoc(
-        volunteerDocRef,
-        { currentTask: { id: `${firstName}_${lastName}_${timestamp}`, task } },
-        { merge: true }
-      );
-  
+
       alert(`✅ Checked in: ${firstName} ${lastName} for ${task}`);
-  
-      // 👉 Save firstName and lastName in localStorage to preserve them across navigations
+
       localStorage.setItem(
         "teamLeadInfo",
         JSON.stringify({ firstName, lastName, task, event })
       );
-  
-      // ✅ Clear fields after saving to localStorage
+
       setFirstName("");
       setLastName("");
     } catch (error) {
@@ -107,33 +108,18 @@ const TaskCheckInForm = () => {
       setError("❌ Failed to check in. Please try again.");
     }
   };
-  
 
   return (
-    <div
-      className={`task-checkin-form ${
-        event === "ATL Tech Week" ? "atl-tech-week" : "render-event"
-      }`}
-    >
+    <div className={`task-checkin-form ${event === "ATL Tech Week" ? "atl-tech-week" : "render-event"}`}>
       <h2>Task Check-In Form</h2>
       <form onSubmit={handleSubmit}>
         <div>
           <label>First Name:</label>
-          <input
-            type="text"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            required
-          />
+          <input type="text" value={firstName} onChange={(e) => setFirstName(e.target.value)} required />
         </div>
         <div>
           <label>Last Name:</label>
-          <input
-            type="text"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            required
-          />
+          <input type="text" value={lastName} onChange={(e) => setLastName(e.target.value)} required />
         </div>
         <div>
           <label>Task:</label>
@@ -148,25 +134,21 @@ const TaskCheckInForm = () => {
       </form>
 
       {isTeamLeadPath && (
-  <button
-    className="back-button"
-    onClick={() => {
-      const teamLeadData = JSON.parse(localStorage.getItem("teamLeadInfo"));
-
-      if (teamLeadData) {
-        const { firstName, lastName, task, event } = teamLeadData;
-
-        navigate(
-          `/teamlead-qr?firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&task=${encodeURIComponent(task)}&event=${encodeURIComponent(event)}`
-        );
-      } else {
-        alert("⚠️ No team lead information found.");
-      }
-    }}
-  >
-    Back to QR Code
-  </button>
-)}
+        <button
+          className="back-button"
+          onClick={() => {
+            const teamLeadData = JSON.parse(localStorage.getItem("teamLeadInfo"));
+            if (teamLeadData) {
+              const { firstName, lastName, task, event } = teamLeadData;
+              navigate(`/teamlead-qr?firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&task=${encodeURIComponent(task)}&event=${encodeURIComponent(event)}`);
+            } else {
+              alert("⚠️ No team lead information found.");
+            }
+          }}
+        >
+          Back to QR Code
+        </button>
+      )}
     </div>
   );
 };
