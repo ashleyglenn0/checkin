@@ -1,8 +1,30 @@
 import React, { useState, useEffect } from "react";
+import {
+  Box,
+  Button,
+  Checkbox,
+  FormControlLabel,
+  MenuItem,
+  Stack,
+  TextField,
+  Typography,
+  CssBaseline,
+  Container,
+} from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { db, checkInsRef } from "../config/firebaseConfig";
 import { collection, query, where, getDocs, addDoc, Timestamp } from "firebase/firestore";
-import "../styles.css";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+import PageLayout from "../components/PageLayout";
+
+const renderTheme = createTheme({
+  palette: {
+    mode: "light",
+    background: { default: "#fdf0e2", paper: "#ffffff" },
+    primary: { main: "#fe88df" },
+    text: { primary: "#711b43" },
+  },
+});
 
 const CheckInForm = ({ showAdminButtons = false }) => {
   const [searchParams] = useSearchParams();
@@ -10,10 +32,10 @@ const CheckInForm = ({ showAdminButtons = false }) => {
   const [lastName, setLastName] = useState("");
   const [staffMember, setStaffMember] = useState(null);
   const [isAtlTechWeek, setIsAtlTechWeek] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false); // Track admin role
-  const [qrLink, setQrLink] = useState(""); // For Team Lead manual check-in
-  const [showQRLink, setShowQRLink] = useState(false); // Show QR URL
-  const [countdown, setCountdown] = useState(10); // Countdown timer
+  const [isAdmin, setIsAdmin] = useState(false);
+  const [qrLink, setQrLink] = useState("");
+  const [showQRLink, setShowQRLink] = useState(false);
+  const [countdown, setCountdown] = useState(10);
   const navigate = useNavigate();
 
   const isQRScan = searchParams.has("staff");
@@ -23,7 +45,7 @@ const CheckInForm = ({ showAdminButtons = false }) => {
     if (storedAdmin?.role === "admin") setIsAdmin(true);
 
     const qrStaff = searchParams.get("staff");
-    if (qrStaff) setStaffMember(qrStaff); // Staff member from QR code
+    if (qrStaff) setStaffMember(qrStaff);
   }, [searchParams]);
 
   const handleCheckInOut = async (statusType) => {
@@ -48,18 +70,19 @@ const CheckInForm = ({ showAdminButtons = false }) => {
       if (!userSnapshot.empty) {
         const user = userSnapshot.docs[0].data();
         const userRole = user.role?.toLowerCase() || "no role found";
-        console.log(`🚀 Fetched user role: ${userRole}`);
 
         if (statusType === "Checked In") {
           if (userRole === "admin") {
-            localStorage.setItem("userInfo", JSON.stringify({ firstName, lastName, role: "admin" }));
+            localStorage.setItem(
+              "userInfo",
+              JSON.stringify({ firstName, lastName, role: "admin" })
+            );
             setIsAdmin(true);
             alert("✅ Admin successfully checked in. Redirecting...");
             return setTimeout(() => navigate("/admin/dashboard"), 100);
           }
 
           if (userRole === "teamlead") {
-            // ✅ Log team lead check-in
             await addDoc(checkInsRef, {
               first_name: firstName,
               last_name: lastName,
@@ -69,14 +92,18 @@ const CheckInForm = ({ showAdminButtons = false }) => {
               isAtlTechWeek,
             });
 
-            const generatedLink = `${window.location.origin}/teamlead-qr?firstName=${encodeURIComponent(firstName)}&lastName=${encodeURIComponent(lastName)}&task=${encodeURIComponent(user.assignedTask)}&event=${encodeURIComponent(user.event)}`;
+            const generatedLink = `${window.location.origin}/teamlead-qr?firstName=${encodeURIComponent(
+              firstName
+            )}&lastName=${encodeURIComponent(
+              lastName
+            )}&task=${encodeURIComponent(
+              user.assignedTask
+            )}&event=${encodeURIComponent(user.event)}`;
 
             if (isQRScan) {
-              // ✅ Redirect if scanned
               alert("✅ Team Lead checked in. Redirecting to QR page...");
               return setTimeout(() => navigate(generatedLink), 100);
             } else {
-              // ✅ Manual check-in: Show QR link for screenshot
               setQrLink(generatedLink);
               setShowQRLink(true);
               setCountdown(10);
@@ -85,7 +112,7 @@ const CheckInForm = ({ showAdminButtons = false }) => {
                 setCountdown((prev) => {
                   if (prev <= 1) {
                     clearInterval(interval);
-                    setShowQRLink(false); // Hide after countdown
+                    setShowQRLink(false);
                   }
                   return prev - 1;
                 });
@@ -98,7 +125,6 @@ const CheckInForm = ({ showAdminButtons = false }) => {
         }
       }
 
-      // ✅ Regular volunteer check-in
       await addDoc(checkInsRef, {
         first_name: firstName,
         last_name: lastName,
@@ -111,7 +137,6 @@ const CheckInForm = ({ showAdminButtons = false }) => {
       alert(`✅ Volunteer successfully ${statusType}!`);
       setFirstName("");
       setLastName("");
-
     } catch (error) {
       console.error("🔥 Error:", error);
       alert("❌ An error occurred. Please try again.");
@@ -119,87 +144,86 @@ const CheckInForm = ({ showAdminButtons = false }) => {
   };
 
   return (
-    <div className="container">
-      <h1>Volunteer Check-In</h1>
+    <ThemeProvider theme={renderTheme}>
+      <CssBaseline />
+      <PageLayout>
+        <Typography variant="h4" gutterBottom color="textPrimary" align="center">
+          Volunteer Check-In
+        </Typography>
 
-      <input
-        type="text"
-        placeholder="First Name"
-        value={firstName}
-        onChange={(e) => setFirstName(e.target.value)}
-      />
-      <input
-        type="text"
-        placeholder="Last Name"
-        value={lastName}
-        onChange={(e) => setLastName(e.target.value)}
-      />
-
-      {!isQRScan && (
-        <select onChange={(e) => setStaffMember(e.target.value)} value={staffMember || ""}>
-          <option value="">Select Staff Member</option>
-          {["Ashley", "Mikal", "Reba", "Lloyd"].map((staff) => (
-            <option key={staff} value={staff}>{staff}</option>
-          ))}
-        </select>
-      )}
-
-      <label>
-        <input
-          type="checkbox"
-          checked={isAtlTechWeek}
-          onChange={() => setIsAtlTechWeek(!isAtlTechWeek)}
-        />
-        Is this volunteer for ATL Tech Week?
-      </label>
-
-      <div style={{ marginTop: "20px" }}>
-        <button className="dashboard" onClick={() => handleCheckInOut("Checked In")}>
-          Check In
-        </button>
-        <button
-          className="dashboard"
-          onClick={() => handleCheckInOut("Checked Out")}
-          style={{ marginLeft: "10px" }}
-        >
-          Check Out
-        </button>
-      </div>
-
-      {/* ✅ Admin dashboard buttons */}
-      {showAdminButtons && isAdmin && (
-        <div style={{ marginTop: "20px" }}>
-          <button className="dashboard" onClick={() => navigate("/admin/dashboard")}>
-            Go to Dashboard
-          </button>
-          <button className="dashboard" style={{ marginLeft: "10px" }} onClick={() => navigate("/admin/qr-code")}>
-            Get Your QR Code
-          </button>
-        </div>
-      )}
-
-      {/* ✅ Display QR link for Team Lead (manual check-in) */}
-      {showQRLink && (
-        <div className="qr-link-popup">
-          <p><strong>Team Lead QR Code Link:</strong></p>
-          <input
-            type="text"
-            value={qrLink}
-            readOnly
-            style={{ width: "100%", padding: "8px", marginBottom: "10px" }}
+        <Stack spacing={2} mt={2}>
+          <TextField
+            label="First Name"
+            value={firstName}
+            onChange={(e) => setFirstName(e.target.value)}
+            fullWidth
           />
-          <button
-            onClick={() => {
-              navigator.clipboard.writeText(qrLink);
-              alert("📋 Link copied to clipboard!");
-            }}
-          >
-            Copy Link
-          </button>
-          <p>⏳ Link will disappear in {countdown} seconds.</p>
-        </div>
-      )}
-    </div>
+          <TextField
+            label="Last Name"
+            value={lastName}
+            onChange={(e) => setLastName(e.target.value)}
+            fullWidth
+          />
+
+          {!isQRScan && (
+            <TextField
+              select
+              label="Select Staff Member"
+              value={staffMember || ""}
+              onChange={(e) => setStaffMember(e.target.value)}
+              fullWidth
+            >
+              {["Ashley", "Mikal", "Reba", "Lloyd"].map((staff) => (
+                <MenuItem key={staff} value={staff}>
+                  {staff}
+                </MenuItem>
+              ))}
+            </TextField>
+          )}
+
+          <FormControlLabel
+            control={
+              <Checkbox
+                checked={isAtlTechWeek}
+                onChange={() => setIsAtlTechWeek(!isAtlTechWeek)}
+              />
+            }
+            label="Is this volunteer for ATL Tech Week?"
+          />
+
+          <Stack direction="row" spacing={2} justifyContent="center" mt={1}>
+            <Button variant="contained" onClick={() => handleCheckInOut("Checked In")}>Check In</Button>
+            <Button variant="outlined" onClick={() => handleCheckInOut("Checked Out")}>Check Out</Button>
+          </Stack>
+
+          {showAdminButtons && isAdmin && (
+            <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
+              <Button variant="contained" onClick={() => navigate("/admin/dashboard")}>Go to Dashboard</Button>
+              <Button variant="outlined" onClick={() => navigate("/admin/qr-code")}>Get Your QR Code</Button>
+            </Stack>
+          )}
+
+          {showQRLink && (
+            <Box mt={3}>
+              <Typography variant="subtitle1">Team Lead QR Code Link:</Typography>
+              <TextField value={qrLink} fullWidth InputProps={{ readOnly: true }} sx={{ mt: 1 }} />
+              <Button
+                onClick={() => {
+                  navigator.clipboard.writeText(qrLink);
+                  alert("📋 Link copied to clipboard!");
+                }}
+                sx={{ mt: 1 }}
+              >
+                Copy Link
+              </Button>
+              <Typography variant="body2" mt={1}>
+                ⏳ Link will disappear in {countdown} seconds.
+              </Typography>
+            </Box>
+          )}
+        </Stack>
+      </PageLayout>
+    </ThemeProvider>
   );
 };
 

@@ -1,7 +1,23 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import "../styles/qrstyles.css";
+import {
+  Box,
+  Typography,
+  Button,
+  Container,
+  CssBaseline
+} from "@mui/material";
+import { ThemeProvider, createTheme } from "@mui/material/styles";
+
+const renderTheme = createTheme({
+  palette: {
+    mode: "light",
+    background: { default: "#fdf0e2", paper: "#ffffff" },
+    primary: { main: "#fe88df" },
+    text: { primary: "#711b43" },
+  },
+});
 
 const AdminQRPage = () => {
   const navigate = useNavigate();
@@ -13,7 +29,7 @@ const AdminQRPage = () => {
       setAdminInfo(storedAdmin);
     } else {
       alert("⚠️ No admin found. Please check in as an admin first.");
-      navigate("/admin/check-in");
+      navigate("/admin/checkin");
     }
   }, [navigate]);
 
@@ -25,17 +41,48 @@ const AdminQRPage = () => {
   )}`;
 
   return (
-    <div className="qr-page-container render-event">
-      <h2>Welcome, {adminInfo.firstName} {adminInfo.lastName}</h2>
-      <p><strong>Event:</strong> {adminInfo.event || "Render"}</p>
-      <div className="qr-code-container">
-        <QRCodeCanvas value={qrValue} size={220} level="H" />
-        <p>Scan this code to check volunteers in/out.</p>
-      </div>
-      <button onClick={() => navigate("/admin/checkin")}>
-        Back to Check-In
-      </button>
-    </div>
+    <ThemeProvider theme={renderTheme}>
+      <CssBaseline />
+      <Box
+        sx={{
+          backgroundColor: renderTheme.palette.background.default,
+          minHeight: "100vh",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          p: 3,
+        }}
+      >
+        <Container
+          maxWidth="sm"
+          sx={{
+            backgroundColor: renderTheme.palette.background.paper,
+            borderRadius: 2,
+            boxShadow: 3,
+            p: 4,
+            textAlign: "center",
+          }}
+        >
+          <Typography variant="h5" gutterBottom color="textPrimary">
+            Welcome, {adminInfo.firstName} {adminInfo.lastName}
+          </Typography>
+          <Typography variant="subtitle1" color="textPrimary" gutterBottom>
+            <strong>Event:</strong> {adminInfo.event || "Render"}
+          </Typography>
+
+          <Box sx={{ my: 3 }}>
+            <QRCodeCanvas value={qrValue} size={220} level="H" />
+            <Typography variant="body1" mt={2} color="textPrimary">
+              Scan this code to check volunteers in/out.
+            </Typography>
+          </Box>
+
+          <Button variant="contained" onClick={() => navigate("/admin/checkin")}>
+            Back to Check-In
+          </Button>
+        </Container>
+      </Box>
+    </ThemeProvider>
   );
 };
 
