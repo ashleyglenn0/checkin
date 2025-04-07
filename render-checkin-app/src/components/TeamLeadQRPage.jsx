@@ -1,4 +1,4 @@
-// Updated TeamLeadQRPage.js to reverse overdue logic and make all alerts dismissible
+// New file: TeamLeadQRPage.js
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import {
@@ -17,9 +17,7 @@ import {
   Alert,
   CssBaseline,
   Paper,
-  IconButton,
 } from "@mui/material";
-import CloseIcon from "@mui/icons-material/Close";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import PageLayout from "../components/PageLayout";
 
@@ -50,8 +48,7 @@ const TeamLeadQRPage = () => {
   const [event, setEvent] = useState("");
   const [showQR, setShowQR] = useState(false);
   const [teamLeadAlerts, setTeamLeadAlerts] = useState([]);
-  const [needsBreak, setNeedsBreak] = useState([]);
-  const [missingReturn, setMissingReturn] = useState([]);
+  const [overdueReturns, setOverdueReturns] = useState([]);
   const [coveragePercentage, setCoveragePercentage] = useState(null);
 
   const firstName = searchParams.get("firstName") || "";
@@ -87,11 +84,10 @@ const TeamLeadQRPage = () => {
   useEffect(() => {
     if (!event || !task) return;
 
-    const normalizedEvent = event.trim().toLowerCase();
-
     const fetchAlertsAndStats = async () => {
       const alertsRef = collection(db, "alerts");
-      const snapshot = await getDocs(alertsRef);
+      const q = query(alertsRef, where("event", "==", event));
+      const snapshot = await getDocs(q);
 
       const localKey = `dismissedTeamLeadAlerts_${firstName}_${lastName}`;
       const dismissed = JSON.parse(localStorage.getItem(localKey) || "[]");
@@ -101,14 +97,15 @@ const TeamLeadQRPage = () => {
         .filter(
           (alert) =>
             !dismissed.includes(alert.id) &&
-            alert.event?.trim().toLowerCase() === normalizedEvent &&
-            ["everyone", "teamlead-all", "teamlead-direct"].includes(alert.audience) &&
+            ["everyone", "teamlead-all", "teamlead-direct"].includes(
+              alert.audience
+            ) &&
             (alert.audience !== "teamlead-direct" || alert.task === task)
         );
 
       setTeamLeadAlerts(filtered);
 
-      // New logic: split into needsBreak and missingReturn
+      // Coverage and overdue logic
       const checkinsRef = collection(db, "task_checkins");
       const checkinQ = query(
         checkinsRef,
@@ -118,23 +115,17 @@ const TeamLeadQRPage = () => {
       const checkinSnap = await getDocs(checkinQ);
 
       const now = new Date();
-      const needsBreakList = [];
-      const missingReturnList = [];
       let active = 0;
+      const overdueList = [];
 
       checkinSnap.docs.forEach((doc) => {
         const data = doc.data();
-        const checkInTime = new Date(data.checkinTime);
-        const minutes = Math.floor((now - checkInTime) / 60000);
-
         if (!data.checkoutTime) {
           active++;
-          if (minutes > 90) {
-            needsBreakList.push({ ...data, duration: minutes });
-          }
-        } else {
-          if (minutes > 90) {
-            missingReturnList.push({ ...data, duration: minutes });
+          const checkInTime = new Date(data.checkinTime);
+          const minutes = Math.floor((now - checkInTime) / 60000);
+          if (minutes > 60) {
+            overdueList.push({ ...data, duration: minutes });
           }
         }
       });
@@ -148,11 +139,10 @@ const TeamLeadQRPage = () => {
         where("date", "==", today)
       );
       const schedSnap = await getDocs(schedQ);
-      const scheduledCount = schedSnap.size || 1;
+      const scheduledCount = schedSnap.size || 1; // avoid divide-by-zero
 
       setCoveragePercentage(Math.round((active / scheduledCount) * 100));
-      setNeedsBreak(needsBreakList);
-      setMissingReturn(missingReturnList);
+      setOverdueReturns(overdueList);
     };
 
     fetchAlertsAndStats();
@@ -179,13 +169,20 @@ const TeamLeadQRPage = () => {
         <Typography variant="h5" gutterBottom>
           Welcome, {firstName} {lastName}
         </Typography>
-        <Typography>Event: <strong>{event}</strong></Typography>
-        <Typography>Assigned Task: <strong>{task}</strong></Typography>
+        <Typography>
+          Event: <strong>{event}</strong>
+        </Typography>
+        <Typography>
+          Assigned Task: <strong>{task}</strong>
+        </Typography>
 
         <Box sx={{ my: 3 }}>
           <Typography variant="h6">📊 Task Overview</Typography>
           <Typography>
-            ✅ Current Coverage: {coveragePercentage !== null ? `${coveragePercentage}%` : "Loading..."}
+            ✅ Current Coverage:{" "}
+            {coveragePercentage !== null
+              ? `${coveragePercentage}%`
+              : "Loading..."}
           </Typography>
 
           {coveragePercentage < 60 && (
@@ -194,23 +191,14 @@ const TeamLeadQRPage = () => {
             </Alert>
           )}
 
-          {needsBreak.length > 0 && (
+          {overdueReturns.length > 0 && (
             <Alert severity="info" sx={{ mt: 2 }}>
-              💤 Volunteers who may need a break:
+              ⚠️ Volunteers overdue from break:
               <ul>
-                {needsBreak.map((v, i) => (
-                  <li key={i}>{v.first_name} {v.last_name} — working for {v.duration} mins</li>
-                ))}
-              </ul>
-            </Alert>
-          )}
-
-          {missingReturn.length > 0 && (
-            <Alert severity="warning" sx={{ mt: 2 }}>
-              🚨 Volunteers checked out over 90 mins ago:
-              <ul>
-                {missingReturn.map((v, i) => (
-                  <li key={i}>{v.first_name} {v.last_name} — {v.duration} mins since check-out</li>
+                {overdueReturns.map((v, i) => (
+                  <li key={i}>
+                    {v.first_name} {v.last_name} — {v.duration} mins ago
+                  </li>
                 ))}
               </ul>
             </Alert>
@@ -220,15 +208,7 @@ const TeamLeadQRPage = () => {
             <Alert
               key={alert.id}
               severity={alert.severity || "info"}
-              action={
-                <IconButton
-                  aria-label="close"
-                  size="small"
-                  onClick={() => handleDismissAlert(alert.id)}
-                >
-                  <CloseIcon fontSize="inherit" />
-                </IconButton>
-              }
+              onClose={() => handleDismissAlert(alert.id)}
               sx={{ mt: 2 }}
             >
               {alert.message}
@@ -252,7 +232,9 @@ const TeamLeadQRPage = () => {
               variant="outlined"
               onClick={() =>
                 navigate(
-                  `/teamlead/task-checkin?task=${encodeURIComponent(task)}&teamLead=${encodeURIComponent(
+                  `/teamlead/task-checkin?task=${encodeURIComponent(
+                    task
+                  )}&teamLead=${encodeURIComponent(
                     `${firstName} ${lastName}`
                   )}&event=${encodeURIComponent(event)}&manual=true`
                 )

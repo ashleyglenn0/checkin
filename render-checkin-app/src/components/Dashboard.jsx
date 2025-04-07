@@ -1,6 +1,6 @@
 // Admin Dashboard with Traffic Monitor and Full Logic Restored
 import React, { useState, useEffect } from "react";
-import { useNavigate } from "react-router-dom";
+import { useSearchParams, useNavigate } from "react-router-dom";
 import { db } from "../config/firebaseConfig";
 import {
   collection,
@@ -52,6 +52,7 @@ const atlTheme = createTheme({
 const trafficZones = ["Registration", "Main Stage", "Food Truck Park"];
 
 const Dashboard = () => {
+  const [searchParams] = useSearchParams();
   const [isAtlTechWeek, setIsAtlTechWeek] = useState(
     JSON.parse(localStorage.getItem("isAtlTechWeek")) || false
   );
@@ -62,6 +63,7 @@ const Dashboard = () => {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [alerts, setAlerts] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
+  const [isAdmin, setIsAdmin] = useState(false);
   const [newAlert, setNewAlert] = useState({
     message: "",
     severity: "info",
@@ -224,14 +226,16 @@ const Dashboard = () => {
   }, [isAtlTechWeek]);
 
   useEffect(() => {
-    const params = new URLSearchParams(window.location.search);
-    const eventParam = params.get("event");
-    if (eventParam === "atl") {
-      setIsAtlTechWeek(true);
-    } else if (eventParam === "render") {
-      setIsAtlTechWeek(false);
+    const storedAdmin = JSON.parse(localStorage.getItem("adminInfo"));
+    const currentPath = window.location.pathname;
+  
+    if (storedAdmin?.role === "admin" || currentPath.includes("/admin")) {
+      setIsAdmin(true);
     }
-  }, []);
+  
+    const qrStaff = searchParams.get("staff");
+    if (qrStaff) setStaffMember(qrStaff);
+  }, [searchParams]);
 
   const currentTheme = isAtlTechWeek ? atlTheme : renderTheme;
   const coverageRate = scheduledCount > 0 ? Math.round((checkIns / scheduledCount) * 100) : 0;

@@ -9,6 +9,7 @@ import TaskDashboard from "./components/TaskDashboard";
 import AdminQRCode from "./components/AdminQRCodePage";
 import TeamLeadQRPage from "./components/TeamLeadQRPage";
 import RoleBasedAccess from "./components/RoleBasedAccess";
+import RecoverQRPage from "./components/RecoverQRPage";
 
 const App = () => {
   useEffect(() => {
@@ -54,6 +55,7 @@ const App = () => {
         <Route path="/task-check-in" element={<TaskCheckInForm />} />
         <Route path="/teamlead-qr" element={<TeamLeadQRPage />} />
         <Route path="/teamlead/task-checkin" element={<TaskCheckInForm />} />
+        <Route path="/recover-qr" element={<RecoverQRPage />} />
 
         {/* Protected Admin Routes */}
         <Route element={<RoleBasedAccess allowedRoles={["admin"]} />}>
