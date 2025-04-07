@@ -4,7 +4,6 @@ import CheckInForm from "./components/CheckInForm";
 import Dashboard from "./components/Dashboard";
 import Reports from "./components/Reports";
 import Schedule from "./components/Schedule";
-import ThemePreview from "./components/ThemePreview";
 import TaskCheckInForm from "./components/TaskCheckInForm";
 import TaskDashboard from "./components/TaskDashboard";
 import AdminQRCode from "./components/AdminQRCodePage";
@@ -52,12 +51,11 @@ const App = () => {
     <Router>
       <Routes>
         <Route path="/" element={<CheckInForm />} />
-        <Route path="/theme-preview" element={<ThemePreview />} />
         <Route path="/task-check-in" element={<TaskCheckInForm />} />
-
         <Route path="/teamlead-qr" element={<TeamLeadQRPage />} />
         <Route path="/teamlead/task-checkin" element={<TaskCheckInForm />} />
 
+        {/* Protected Admin Routes */}
         <Route element={<RoleBasedAccess allowedRoles={["admin"]} />}>
           <Route path="/admin/checkin" element={<CheckInForm showAdminButtons={true} />} />
           <Route path="/admin/dashboard" element={<Dashboard />} />

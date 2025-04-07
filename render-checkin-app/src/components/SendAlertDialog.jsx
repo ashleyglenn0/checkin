@@ -55,6 +55,7 @@ const SendAlertDialog = ({
             label="Send To"
             onChange={(e) => setNewAlert({ ...newAlert, audience: e.target.value })}
           >
+            <MenuItem value="everyone">Everyone</MenuItem>
             <MenuItem value="admin-all">All Admins</MenuItem>
             <MenuItem value="admin-direct">Specific Admin</MenuItem>
             <MenuItem value="teamlead-all">All Team Leads</MenuItem>

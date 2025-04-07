@@ -9,11 +9,17 @@ import {
   TextField,
   Typography,
   CssBaseline,
-  Container,
 } from "@mui/material";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { db, checkInsRef } from "../config/firebaseConfig";
-import { collection, query, where, getDocs, addDoc, Timestamp } from "firebase/firestore";
+import {
+  collection,
+  query,
+  where,
+  getDocs,
+  addDoc,
+  Timestamp,
+} from "firebase/firestore";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import PageLayout from "../components/PageLayout";
 
@@ -28,6 +34,9 @@ const renderTheme = createTheme({
 
 const CheckInForm = ({ showAdminButtons = false }) => {
   const [searchParams] = useSearchParams();
+  const navigate = useNavigate();
+  const isQRScan = searchParams.has("staff");
+
   const [firstName, setFirstName] = useState("");
   const [lastName, setLastName] = useState("");
   const [staffMember, setStaffMember] = useState(null);
@@ -35,10 +44,9 @@ const CheckInForm = ({ showAdminButtons = false }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [qrLink, setQrLink] = useState("");
   const [showQRLink, setShowQRLink] = useState(false);
-  const [countdown, setCountdown] = useState(10);
-  const navigate = useNavigate();
-
-  const isQRScan = searchParams.has("staff");
+  const [countdown, setCountdown] = useState(30);
+  const [useMagicLink, setUseMagicLink] = useState(false);
+  const [adminEmail, setAdminEmail] = useState("");
 
   useEffect(() => {
     const storedAdmin = JSON.parse(localStorage.getItem("adminInfo"));
@@ -49,6 +57,37 @@ const CheckInForm = ({ showAdminButtons = false }) => {
   }, [searchParams]);
 
   const handleCheckInOut = async (statusType) => {
+    if (useMagicLink) {
+      if (!adminEmail) {
+        alert("⚠️ Please enter your admin email.");
+        return;
+      }
+
+      const magicLink = `${
+        window.location.origin
+      }/admin/checkin?email=${encodeURIComponent(adminEmail)}`;
+
+      try {
+        await fetch(
+          "https://us-central1-volunteercheckin-3659e.cloudfunctions.net/sendMagicLink",
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({ email: adminEmail, link: magicLink }),
+          }
+        );
+
+        alert("✅ Magic link sent! Check your email.");
+        setAdminEmail("");
+        setUseMagicLink(false);
+      } catch (error) {
+        console.error("❌ Error sending magic link:", error);
+        alert("❌ Failed to send magic link. Please try again.");
+      }
+
+      return;
+    }
+
     if (!firstName || !lastName) {
       alert("⚠️ Please enter both first and last name.");
       return;
@@ -92,7 +131,9 @@ const CheckInForm = ({ showAdminButtons = false }) => {
               isAtlTechWeek,
             });
 
-            const generatedLink = `${window.location.origin}/teamlead-qr?firstName=${encodeURIComponent(
+            const generatedLink = `${
+              window.location.origin
+            }/teamlead-qr?firstName=${encodeURIComponent(
               firstName
             )}&lastName=${encodeURIComponent(
               lastName
@@ -106,7 +147,7 @@ const CheckInForm = ({ showAdminButtons = false }) => {
             } else {
               setQrLink(generatedLink);
               setShowQRLink(true);
-              setCountdown(10);
+              setCountdown(30);
 
               const interval = setInterval(() => {
                 setCountdown((prev) => {
@@ -118,7 +159,7 @@ const CheckInForm = ({ showAdminButtons = false }) => {
                 });
               }, 1000);
 
-              alert("✅ Team Lead checked in (manual entry). QR link displayed.");
+              alert("✅ Team Lead checked in. QR link displayed.");
               return;
             }
           }
@@ -147,66 +188,124 @@ const CheckInForm = ({ showAdminButtons = false }) => {
     <ThemeProvider theme={renderTheme}>
       <CssBaseline />
       <PageLayout>
-        <Typography variant="h4" gutterBottom color="textPrimary" align="center">
+        <Typography variant="h4" gutterBottom align="center">
           Volunteer Check-In
         </Typography>
 
         <Stack spacing={2} mt={2}>
-          <TextField
-            label="First Name"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Last Name"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            fullWidth
-          />
-
-          {!isQRScan && (
-            <TextField
-              select
-              label="Select Staff Member"
-              value={staffMember || ""}
-              onChange={(e) => setStaffMember(e.target.value)}
-              fullWidth
-            >
-              {["Ashley", "Mikal", "Reba", "Lloyd"].map((staff) => (
-                <MenuItem key={staff} value={staff}>
-                  {staff}
-                </MenuItem>
-              ))}
-            </TextField>
+          {!showAdminButtons && (
+            <FormControlLabel
+              control={
+                <Checkbox
+                  checked={useMagicLink}
+                  onChange={(e) => setUseMagicLink(e.target.checked)}
+                />
+              }
+              label="I am an Admin - Send me a Magic Link"
+            />
           )}
 
-          <FormControlLabel
-            control={
-              <Checkbox
-                checked={isAtlTechWeek}
-                onChange={() => setIsAtlTechWeek(!isAtlTechWeek)}
+          {useMagicLink ? (
+            <>
+              <TextField
+                label="Admin Email"
+                type="email"
+                value={adminEmail}
+                onChange={(e) => setAdminEmail(e.target.value)}
+                fullWidth
+                required
               />
-            }
-            label="Is this volunteer for ATL Tech Week?"
-          />
+              <Button
+                variant="contained"
+                onClick={() => handleCheckInOut("Checked In")}
+              >
+                Send Magic Link
+              </Button>
+            </>
+          ) : (
+            <>
+              <TextField
+                label="First Name"
+                value={firstName}
+                onChange={(e) => setFirstName(e.target.value)}
+                fullWidth
+              />
+              <TextField
+                label="Last Name"
+                value={lastName}
+                onChange={(e) => setLastName(e.target.value)}
+                fullWidth
+              />
+              {!isQRScan && (
+                <TextField
+                  select
+                  label="Select Staff Member"
+                  value={staffMember || ""}
+                  onChange={(e) => setStaffMember(e.target.value)}
+                  fullWidth
+                >
+                  {["Ashley", "Mikal", "Reba", "Lloyd"].map((staff) => (
+                    <MenuItem key={staff} value={staff}>
+                      {staff}
+                    </MenuItem>
+                  ))}
+                </TextField>
+              )}
+              <FormControlLabel
+                control={
+                  <Checkbox
+                    checked={isAtlTechWeek}
+                    onChange={() => setIsAtlTechWeek(!isAtlTechWeek)}
+                  />
+                }
+                label="Is this volunteer for ATL Tech Week?"
+              />
 
-          <Stack direction="row" spacing={2} justifyContent="center" mt={1}>
-            <Button variant="contained" onClick={() => handleCheckInOut("Checked In")}>Check In</Button>
-            <Button variant="outlined" onClick={() => handleCheckInOut("Checked Out")}>Check Out</Button>
-          </Stack>
+              <Stack direction="row" spacing={2} justifyContent="center">
+                <Button
+                  variant="contained"
+                  onClick={() => handleCheckInOut("Checked In")}
+                >
+                  Check In
+                </Button>
+                <Button
+                  variant="outlined"
+                  onClick={() => handleCheckInOut("Checked Out")}
+                >
+                  Check Out
+                </Button>
+              </Stack>
+            </>
+          )}
 
           {showAdminButtons && isAdmin && (
             <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
-              <Button variant="contained" onClick={() => navigate("/admin/dashboard")}>Go to Dashboard</Button>
-              <Button variant="outlined" onClick={() => navigate("/admin/qr-code")}>Get Your QR Code</Button>
+              <Button
+                variant="contained"
+                onClick={() => navigate("/admin/dashboard")}
+              >
+                Go to Dashboard
+              </Button>
+              <Button
+                variant="outlined"
+                onClick={() => navigate("/admin/qr-code")}
+              >
+                Get Your QR Code
+              </Button>
             </Stack>
           )}
 
           {showQRLink && (
             <Box mt={3}>
-              <Typography variant="subtitle1">Team Lead QR Code Link:</Typography>
-              <TextField value={qrLink} fullWidth InputProps={{ readOnly: true }} sx={{ mt: 1 }} />
+              <Typography variant="subtitle1">
+                Team Lead QR Code Link:
+              </Typography>
+              <TextField
+                value={qrLink}
+                fullWidth
+                InputProps={{ readOnly: true }}
+                sx={{ mt: 1 }}
+              />
               <Button
                 onClick={() => {
                   navigator.clipboard.writeText(qrLink);

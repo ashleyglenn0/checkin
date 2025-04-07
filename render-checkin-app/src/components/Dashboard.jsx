@@ -1,3 +1,4 @@
+// Admin Dashboard with Traffic Monitor and Full Logic Restored
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import { db } from "../config/firebaseConfig";
@@ -11,6 +12,8 @@ import {
   serverTimestamp,
   getDoc,
   deleteDoc,
+  setDoc,
+  onSnapshot,
 } from "firebase/firestore";
 import {
   Box,
@@ -22,7 +25,9 @@ import {
   Stack,
   Grid,
   useMediaQuery,
+  IconButton,
 } from "@mui/material";
+import CircleIcon from "@mui/icons-material/Circle";
 import { useTheme, createTheme, ThemeProvider } from "@mui/material/styles";
 import SendAlertDialog from "./SendAlertDialog";
 
@@ -44,6 +49,8 @@ const atlTheme = createTheme({
   },
 });
 
+const trafficZones = ["Registration", "Main Stage", "Food Truck Park"];
+
 const Dashboard = () => {
   const [isAtlTechWeek, setIsAtlTechWeek] = useState(
     JSON.parse(localStorage.getItem("isAtlTechWeek")) || false
@@ -52,7 +59,7 @@ const Dashboard = () => {
   const [checkIns, setCheckIns] = useState(0);
   const [checkOuts, setCheckOuts] = useState(0);
   const [noShows, setNoShows] = useState(0);
-  const [tasksCompleted, setTasksCompleted] = useState("85%");
+  const [scheduledCount, setScheduledCount] = useState(0);
   const [alerts, setAlerts] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
   const [newAlert, setNewAlert] = useState({
@@ -61,11 +68,17 @@ const Dashboard = () => {
     audience: "admin-all",
   });
   const [slackMessages, setSlackMessages] = useState([]);
+  const [trafficLevels, setTrafficLevels] = useState({});
 
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
-  const activeEvent = isAtlTechWeek ? "ATL" : "Render";
+  const activeEvent = isAtlTechWeek ? "ATL Tech Week" : "Render";
+
+  const handleLogout = () => {
+    localStorage.removeItem("adminInfo");
+    navigate("/");
+  };
 
   const handleAddAlert = async () => {
     try {
@@ -81,21 +94,10 @@ const Dashboard = () => {
       setAlerts((prev) => [...prev, { id: docRef.id, ...addedDoc.data() }]);
       setOpenDialog(false);
 
-      console.log("🟣 Alert being checked for Slack:", newAlert);
-      console.log("🔍 Severity:", newAlert.severity);
-      console.log("🔍 Audience:", newAlert.audience);
-      console.log(
-        "🔍 Condition result:",
-        newAlert.audience?.startsWith("admin"),
-        newAlert.severity === "urgent"
-      );
-
       if (
         newAlert.audience?.startsWith("admin") &&
         newAlert.severity === "error"
       ) {
-        console.log("📢 Calling Slack webhook for urgent alert...");
-
         const res = await fetch(
           "https://us-central1-volunteercheckin-3659e.cloudfunctions.net/sendSlackAlert",
           {
@@ -105,8 +107,7 @@ const Dashboard = () => {
           }
         );
 
-        const result = await res.text();
-        console.log("📢 Slack webhook response:", result);
+        await res.text();
       }
     } catch (error) {
       console.error("❌ handleAddAlert error:", error);
@@ -120,7 +121,6 @@ const Dashboard = () => {
           "https://us-central1-volunteercheckin-3659e.cloudfunctions.net/getSlackMessages"
         );
         const messages = await res.json();
-        console.log("Slack fetch result:", messages);
         setSlackMessages(messages);
       } catch (error) {
         console.error("Failed to fetch Slack messages:", error);
@@ -128,8 +128,6 @@ const Dashboard = () => {
     };
 
     const fetchStats = async () => {
-      const today = new Date();
-      today.setHours(0, 0, 0, 0);
       const eventFilter = where("event", "==", activeEvent);
 
       const checkInsSnap = await getDocs(
@@ -144,9 +142,9 @@ const Dashboard = () => {
 
       setCheckIns(checkInsSnap.size);
       setCheckOuts(checkOutsSnap.size);
+      setScheduledCount(scheduledSnap.size);
       setNoShows(scheduledSnap.size - checkInsSnap.size);
     };
-
     const fetchAlerts = async () => {
       try {
         const today = new Date();
@@ -209,15 +207,39 @@ const Dashboard = () => {
       setLongTaskVolunteers(volunteers.filter((v) => v.status === "overdue"));
     };
 
+    const unsubscribe = onSnapshot(collection(db, "traffic_levels"), (snapshot) => {
+      const levels = {};
+      snapshot.forEach((doc) => {
+        levels[doc.id] = doc.data().level;
+      });
+      setTrafficLevels(levels);
+    });
+
     fetchSlackMessages();
     fetchAlerts();
     fetchStats();
     fetchLongTaskVolunteers();
-    const interval = setInterval(fetchSlackMessages, 60000);
-    return () => clearInterval(interval);
+
+    return () => unsubscribe();
   }, [isAtlTechWeek]);
 
+  useEffect(() => {
+    const params = new URLSearchParams(window.location.search);
+    const eventParam = params.get("event");
+    if (eventParam === "atl") {
+      setIsAtlTechWeek(true);
+    } else if (eventParam === "render") {
+      setIsAtlTechWeek(false);
+    }
+  }, []);
+
   const currentTheme = isAtlTechWeek ? atlTheme : renderTheme;
+  const coverageRate = scheduledCount > 0 ? Math.round((checkIns / scheduledCount) * 100) : 0;
+
+  const updateTrafficLevel = async (zone, level) => {
+    const docRef = doc(db, "traffic_levels", zone);
+    await setDoc(docRef, { level, event: activeEvent }, { merge: true });
+  };
 
   return (
     <ThemeProvider theme={currentTheme}>
@@ -235,59 +257,25 @@ const Dashboard = () => {
           borderBottom: "1px solid #ddd",
         }}
       >
-        <Stack
-          direction={isMobile ? "column" : "row"}
-          spacing={2}
-          alignItems="center"
-        >
+        <Stack direction={isMobile ? "column" : "row"} spacing={2} alignItems="center">
           <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Volunteer Dashboard
+            Admin Dashboard
           </Typography>
-          <Button
-            variant="outlined"
-            onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}
-          >
+          <Button variant="outlined" onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
             Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
           </Button>
-          <Button
-            variant="contained"
-            onClick={() => navigate("/admin/schedule")}
-          >
-            View Schedule
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => navigate("/admin/checkin")}
-          >
-            Back to Check-In
-          </Button>
-          <Button
-            variant="contained"
-            onClick={() => navigate("/admin/reports")}
-          >
-            Reports
-          </Button>
-          <Button
-            variant="contained"
-            color="primary"
-            onClick={() => setOpenDialog(true)}
-          >
-            Send Alert
-          </Button>
+          <Button variant="contained" onClick={() => navigate("/admin/schedule")}>View Schedule</Button>
+          <Button variant="contained" onClick={() => navigate("/admin/checkin")}>Back to Check-In</Button>
+          <Button variant="contained" onClick={() => navigate("/admin/reports")}>Reports</Button>
+          <Button variant="contained" color="primary" onClick={() => setOpenDialog(true)}>Send Alert</Button>
+          <Button variant="outlined" onClick={handleLogout}>Log Out</Button>
         </Stack>
       </Box>
 
-      {/* Main Content */}
-      <Box
-        sx={{
-          p: isMobile ? 2 : 4,
-          overflowY: "auto",
-          maxHeight: "calc(100vh - 64px)",
-        }}
-      >
+      <Box sx={{ p: isMobile ? 2 : 4 }}>
         {/* Metrics */}
-        <Grid container spacing={2} mb={2}>
-          <Grid item xs={12} sm={6} md={3}>
+        <Grid container spacing={2} mb={2} alignItems="flex-start">
+          <Grid item xs={12} sm={6} md={3} lg={2.5}>
             <Paper elevation={3} sx={{ p: 2, backgroundColor: "#e3f2fd" }}>
               <Typography variant="subtitle2">Check-Ins (Today)</Typography>
               <Typography variant="h5">{checkIns}</Typography>
@@ -307,11 +295,39 @@ const Dashboard = () => {
           </Grid>
           <Grid item xs={12} sm={6} md={3}>
             <Paper elevation={3} sx={{ p: 2, backgroundColor: "#e8f5e9" }}>
-              <Typography variant="subtitle2">Tasks Completed</Typography>
-              <Typography variant="h5">{tasksCompleted}</Typography>
+              <Typography variant="subtitle2">Coverage Rate</Typography>
+              <Typography variant="h5">{coverageRate}%</Typography>
             </Paper>
           </Grid>
         </Grid>
+
+        {/* Traffic Monitor */}
+        <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
+          <Typography variant="h6" gutterBottom>Traffic Monitor</Typography>
+          {trafficZones.map((zone) => (
+            <Box key={zone} sx={{ mb: 2 }}>
+              <Typography variant="subtitle2">{zone}</Typography>
+              <Stack direction="row" spacing={1} alignItems="center">
+                {[1, 2, 3, 4, 5].map((level) => (
+                  <IconButton
+                    key={level}
+                    size="small"
+                    onClick={() => updateTrafficLevel(zone, level)}
+                  >
+                    <CircleIcon
+                      sx={{
+                        color:
+                          level <= (trafficLevels[zone] || 0)
+                            ? currentTheme.palette.primary.main
+                            : "#ccc",
+                      }}
+                    />
+                  </IconButton>
+                ))}
+              </Stack>
+            </Box>
+          ))}
+        </Paper>
 
         {/* Long Task Volunteers */}
         <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
@@ -324,15 +340,20 @@ const Dashboard = () => {
             longTaskVolunteers.map((v, idx) => (
               <Box key={idx} sx={{ my: 0.5 }}>
                 <Typography>
-                  {v.name} - {v.task} - {v.duration} mins (Overdue by{" "}
-                  {v.overdueBy ??
+                  {v.name} - {v.task} - {v.duration} mins (Overdue by {v.overdueBy ??
                     v.duration -
-                      (v.task.toLowerCase().includes("food") ? 120 : 180)}{" "}
-                  mins)
+                      (v.task.toLowerCase().includes("food") ? 120 : 180)} mins)
                 </Typography>
               </Box>
             ))
           )}
+          <Button
+            variant="contained"
+            sx={{ mt: 2 }}
+            onClick={() => navigate("/admin/task-dashboard")}
+          >
+            View Task Breakdown
+          </Button>
         </Paper>
 
         {/* Slack Feed */}
@@ -353,7 +374,7 @@ const Dashboard = () => {
           {alerts.length === 0 ? (
             <Typography variant="body2">No recent alerts.</Typography>
           ) : (
-            alerts.map((alert, idx) => (
+            alerts.map((alert) => (
               <Alert
                 key={alert.id}
                 severity={alert.severity}

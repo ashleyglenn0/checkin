@@ -1,5 +1,5 @@
 import React from "react";
-import { Box, Container } from "@mui/material";
+import { Box, Paper } from "@mui/material";
 import { useTheme } from "@mui/material/styles";
 
 const PageLayout = ({ children, centered = false }) => {
@@ -10,24 +10,26 @@ const PageLayout = ({ children, centered = false }) => {
       sx={{
         backgroundColor: theme.palette.background.default,
         minHeight: "100vh",
-        py: 4,
+        width: "100%",
         display: "flex",
         justifyContent: "center",
-        alignItems: centered ? "center" : "flex-start", // ← dynamic here
+        alignItems: centered ? "center" : "flex-start",
+        py: centered ? 0 : 4,
+        px: 2,
       }}
     >
-      <Container
-        maxWidth="sm"
+      <Paper
+        elevation={4}
         sx={{
           backgroundColor: theme.palette.background.paper,
-          p: 4,
-          borderRadius: 2,
-          boxShadow: 3,
+          padding: { xs: 3, sm: 4, md: 6 },
+          borderRadius: 3,
           width: "100%",
+          maxWidth: "600px",
         }}
       >
         {children}
-      </Container>
+      </Paper>
     </Box>
   );
 };
