@@ -47,6 +47,8 @@ const App = () => {
       document.body.appendChild(installButton);
     });
   }, []);
+  console.log("🔥 This is the latest deployed build - April 7th, 1:30PM");
+
 
   return (
     <Router>

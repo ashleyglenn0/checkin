@@ -17,6 +17,7 @@ import {
   Typography,
   CssBaseline,
   Alert,
+  MenuItem,
 } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import PageLayout from "../components/PageLayout";
@@ -50,6 +51,7 @@ const TaskCheckInForm = () => {
   const [task, setTask] = useState("");
   const [teamLead, setTeamLead] = useState("");
   const [event, setEvent] = useState("");
+  const [status, setStatus] = useState("Check In for Task");
   const [error, setError] = useState(null);
   const [successMessage, setSuccessMessage] = useState("");
   const [showBackButton, setShowBackButton] = useState(false);
@@ -79,7 +81,7 @@ const TaskCheckInForm = () => {
     const snapshot = await getDocs(q);
 
     if (snapshot.empty) {
-      return { allowed: false, message: "\u26a0\ufe0f No admin check-in found for today." };
+      return { allowed: false, message: "⚠️ No admin check-in found for today." };
     }
 
     const checkInTime = snapshot.docs[0].data().timestamp.toDate();
@@ -89,7 +91,7 @@ const TaskCheckInForm = () => {
     if (timeDifferenceMinutes < minWaitMinutes) {
       return {
         allowed: false,
-        message: `\u26a0\ufe0f Please wait ${Math.ceil(minWaitMinutes - timeDifferenceMinutes)} more minute(s) before checking in with the team lead while the system updates.`,
+        message: `⚠️ Please wait ${Math.ceil(minWaitMinutes - timeDifferenceMinutes)} more minute(s) before checking in with the team lead while the system updates.`,
       };
     }
 
@@ -115,8 +117,8 @@ const TaskCheckInForm = () => {
         first_name: firstName,
         last_name: lastName,
         task,
-        checkinTime: timestamp,
-        checkoutTime: null,
+        status,
+        time: timestamp,
         teamLead,
         event,
       });
@@ -126,7 +128,7 @@ const TaskCheckInForm = () => {
         JSON.stringify({ firstName, lastName, task, event })
       );
 
-      setSuccessMessage(`✅ ${firstName} ${lastName} successfully checked in.`);
+      setSuccessMessage(`✅ ${firstName} ${lastName} successfully recorded as "${status}".`);
 
       setTimeout(() => {
         navigate(`/teamlead-qr?firstName=${encodeURIComponent(teamLead.split(" ")[0])}&lastName=${encodeURIComponent(teamLead.split(" ")[1] || "")}&task=${encodeURIComponent(task)}&event=${encodeURIComponent(event)}`);
@@ -167,6 +169,25 @@ const TaskCheckInForm = () => {
             required
           />
 
+          <TextField
+            select
+            label="Task Status"
+            value={status}
+            onChange={(e) => setStatus(e.target.value)}
+            fullWidth
+            margin="normal"
+            required
+          >
+            {[
+              "Check In for Task",
+              "Check Out for Break",
+              "Check In from Break",
+              "Check Out from Task"
+            ].map((option) => (
+              <MenuItem key={option} value={option}>{option}</MenuItem>
+            ))}
+          </TextField>
+
           <Typography mt={2}><strong>Task:</strong> {task}</Typography>
           <Typography><strong>Team Lead:</strong> {teamLead}</Typography>
 
@@ -175,7 +196,7 @@ const TaskCheckInForm = () => {
           )}
 
           <Button type="submit" variant="contained" sx={{ mt: 2 }}>
-            Check In
+            Submit
           </Button>
         </Box>
 

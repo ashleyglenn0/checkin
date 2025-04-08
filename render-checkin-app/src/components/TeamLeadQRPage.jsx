@@ -105,7 +105,6 @@ const TeamLeadQRPage = () => {
 
       setTeamLeadAlerts(filtered);
 
-      // Coverage and overdue logic
       const checkinsRef = collection(db, "task_checkins");
       const checkinQ = query(
         checkinsRef,
@@ -120,11 +119,27 @@ const TeamLeadQRPage = () => {
 
       checkinSnap.docs.forEach((doc) => {
         const data = doc.data();
-        if (!data.checkoutTime) {
+        if (
+          data.status === "Check In for Task" ||
+          data.status === "Check In from Break"
+        ) {
           active++;
-          const checkInTime = new Date(data.checkinTime);
-          const minutes = Math.floor((now - checkInTime) / 60000);
-          if (minutes > 60) {
+        }
+
+        if (
+          data.status === "Check Out for Break" &&
+          data.time &&
+          !checkinSnap.docs.some(
+            (d) =>
+              d.data().first_name === data.first_name &&
+              d.data().last_name === data.last_name &&
+              d.data().status === "Check In from Break" &&
+              new Date(d.data().time) > new Date(data.time)
+          )
+        ) {
+          const breakTime = new Date(data.time);
+          const minutes = Math.floor((now - breakTime) / 60000);
+          if (minutes > 30) {
             overdueList.push({ ...data, duration: minutes });
           }
         }
@@ -139,7 +154,7 @@ const TeamLeadQRPage = () => {
         where("date", "==", today)
       );
       const schedSnap = await getDocs(schedQ);
-      const scheduledCount = schedSnap.size || 1; // avoid divide-by-zero
+      const scheduledCount = schedSnap.size || 1;
 
       setCoveragePercentage(Math.round((active / scheduledCount) * 100));
       setOverdueReturns(overdueList);
@@ -179,10 +194,7 @@ const TeamLeadQRPage = () => {
         <Box sx={{ my: 3 }}>
           <Typography variant="h6">📊 Task Overview</Typography>
           <Typography>
-            ✅ Current Coverage:{" "}
-            {coveragePercentage !== null
-              ? `${coveragePercentage}%`
-              : "Loading..."}
+            ✅ Current Coverage: {coveragePercentage !== null ? `${coveragePercentage}%` : "Loading..."}
           </Typography>
 
           {coveragePercentage < 60 && (

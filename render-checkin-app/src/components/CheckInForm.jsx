@@ -37,7 +37,6 @@ const renderTheme = createTheme({
 const CheckInForm = ({ showAdminButtons = false }) => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
-  const isQRScan = searchParams.has("staff");
   const isAdminPath = window.location.pathname.includes("/admin");
 
   const [firstName, setFirstName] = useState("");
@@ -47,19 +46,40 @@ const CheckInForm = ({ showAdminButtons = false }) => {
   const [isAdmin, setIsAdmin] = useState(false);
   const [qrLink, setQrLink] = useState("");
   const [showQRLink, setShowQRLink] = useState(false);
+  const [showDebug, setShowDebug] = useState(false);
   const [countdown, setCountdown] = useState(30);
   const [feedback, setFeedback] = useState({ message: "", type: "", show: false });
 
   useEffect(() => {
+    const url = new URL(window.location.href);
+    const isQR = url.searchParams.has("staff");
     const storedAdmin = JSON.parse(localStorage.getItem("adminInfo"));
-    if (storedAdmin?.role === "admin") setIsAdmin(true);
+    const staffFromQR = url.searchParams.get("staff");
+
+    const isMismatch =
+      storedAdmin?.role === "admin" &&
+      `${storedAdmin.firstName} ${storedAdmin.lastName}` !== staffFromQR;
+
+    if (isQR && isAdminPath && isMismatch) {
+      localStorage.removeItem("adminInfo");
+      navigate("/");
+    }
+
+    // ✅ FIX: Only set admin state if on /admin path
+    if (storedAdmin?.role === "admin" && isAdminPath) {
+      setIsAdmin(true);
+    } else {
+      setIsAdmin(false);
+    }
 
     const qrStaff = searchParams.get("staff");
     if (qrStaff) setStaffMember(qrStaff);
 
-    const lastQRLink = localStorage.getItem("teamLeadQRLink") || localStorage.getItem("adminQRLink");
+    const lastQRLink =
+      localStorage.getItem("teamLeadQRLink") ||
+      localStorage.getItem("adminQRLink");
     if (lastQRLink) setQrLink(lastQRLink);
-  }, [searchParams]);
+  }, [searchParams, navigate, isAdminPath]);
 
   const showAlert = (message, type = "success") => {
     setFeedback({ message, type, show: true });
@@ -97,7 +117,16 @@ const CheckInForm = ({ showAdminButtons = false }) => {
             localStorage.setItem("adminInfo", JSON.stringify({ firstName, lastName, role: "admin" }));
             setIsAdmin(true);
             showAlert("✅ Admin successfully checked in. Redirecting...");
-            return setTimeout(() => navigate("/admin/dashboard"), 1000);
+
+            setTimeout(() => {
+              try {
+                navigate("/admin/dashboard");
+              } catch (e) {
+                console.error("Navigation failed:", e);
+                window.location.href = "/admin/dashboard";
+              }
+            }, 2000);
+            return;
           }
 
           if (userRole === "teamlead") {
@@ -129,9 +158,13 @@ const CheckInForm = ({ showAdminButtons = false }) => {
 
             showAlert("✅ Team Lead checked in. Redirecting to your QR code in 5 seconds...");
             setTimeout(() => {
-              window.location.href = teamLeadQR;
-            }, 5000);
-            return;
+              try {
+                window.location.href = teamLeadQR;
+              } catch (e) {
+                console.error("Redirect failed:", e);
+                window.open(teamLeadQR, "_self");
+              }
+            }, 2000);
           }
         }
       }
@@ -158,6 +191,24 @@ const CheckInForm = ({ showAdminButtons = false }) => {
     <ThemeProvider theme={renderTheme}>
       <CssBaseline />
       <PageLayout>
+        <Typography variant="h6" color="red">🚨 DEBUG MODE ACTIVE</Typography>
+        <Button size="small" onClick={() => setShowDebug(!showDebug)}>
+          Debug
+        </Button>
+        {showDebug && (
+          <Box sx={{ mt: 2, p: 2, bgcolor: "#f0f0f0", fontSize: "12px" }}>
+            <pre>
+              isAdmin: {String(isAdmin)}
+              <br />
+              staffMember: {staffMember || "none"}
+              <br />
+              URL: {window.location.href}
+              <br />
+              localStorage keys: {Object.keys(localStorage).join(", ")}
+            </pre>
+          </Box>
+        )}
+
         <Typography variant="h4" gutterBottom align="center">
           Volunteer Check-In
         </Typography>
@@ -169,57 +220,44 @@ const CheckInForm = ({ showAdminButtons = false }) => {
             </Alert>
           )}
 
-          <TextField
-            label="First Name"
-            value={firstName}
-            onChange={(e) => setFirstName(e.target.value)}
-            fullWidth
-          />
-          <TextField
-            label="Last Name"
-            value={lastName}
-            onChange={(e) => setLastName(e.target.value)}
-            fullWidth
-          />
+          <TextField label="First Name" value={firstName} onChange={(e) => setFirstName(e.target.value)} fullWidth />
+          <TextField label="Last Name" value={lastName} onChange={(e) => setLastName(e.target.value)} fullWidth />
 
-          {!isQRScan && (
-            <TextField
-              select
-              label="Select Staff Member"
-              value={staffMember || ""}
-              onChange={(e) => setStaffMember(e.target.value)}
-              fullWidth
-            >
+          {!searchParams.has("staff") && (
+            <TextField select label="Select Staff Member" value={staffMember || ""} onChange={(e) => setStaffMember(e.target.value)} fullWidth>
               {["Ashley", "Mikal", "Reba", "Lloyd"].map((staff) => (
-                <MenuItem key={staff} value={staff}>
-                  {staff}
-                </MenuItem>
+                <MenuItem key={staff} value={staff}>{staff}</MenuItem>
               ))}
             </TextField>
           )}
 
           <FormControlLabel
-            control={
-              <Checkbox
-                checked={isAtlTechWeek}
-                onChange={() => setIsAtlTechWeek(!isAtlTechWeek)}
-              />
-            }
+            control={<Checkbox checked={isAtlTechWeek} onChange={() => setIsAtlTechWeek(!isAtlTechWeek)} />}
             label="Is this volunteer for ATL Tech Week?"
           />
 
           <Stack direction="row" spacing={2} justifyContent="center">
-            <Button variant="contained" onClick={() => handleCheckInOut("Checked In")}>
-              Check In
-            </Button>
-            <Button variant="outlined" onClick={() => handleCheckInOut("Checked Out")}>
-              Check Out
-            </Button>
+            <Button variant="contained" onClick={() => handleCheckInOut("Checked In")}>Check In</Button>
+            <Button variant="outlined" onClick={() => handleCheckInOut("Checked Out")}>Check Out</Button>
           </Stack>
 
           {(showAdminButtons || isAdminPath || isAdmin) && (
             <Stack direction="row" spacing={2} justifyContent="center" mt={2}>
-              <Button variant="contained" onClick={() => navigate("/admin/dashboard")}>Go to Dashboard</Button>
+              <Button
+                variant="contained"
+                onClick={(e) => {
+                  e.preventDefault();
+                  try {
+                    navigate("/admin/dashboard");
+                  } catch (err) {
+                    console.error("Navigation failed:", err);
+                    window.location.href = "/admin/dashboard";
+                  }
+                }}
+                style={{ touchAction: "manipulation" }}
+              >
+                Go to Dashboard
+              </Button>
               <Button
                 variant="outlined"
                 onClick={() => {
@@ -239,19 +277,11 @@ const CheckInForm = ({ showAdminButtons = false }) => {
           {showQRLink && (
             <Box mt={3}>
               <Typography variant="subtitle1">QR Code Link:</Typography>
-              <TextField
-                value={qrLink}
-                fullWidth
-                InputProps={{ readOnly: true }}
-                sx={{ mt: 1 }}
-              />
-              <Button
-                onClick={() => {
-                  navigator.clipboard.writeText(qrLink);
-                  showAlert("📋 Link copied to clipboard!");
-                }}
-                sx={{ mt: 1 }}
-              >
+              <TextField value={qrLink} fullWidth InputProps={{ readOnly: true }} sx={{ mt: 1 }} />
+              <Button onClick={() => {
+                navigator.clipboard.writeText(qrLink);
+                showAlert("📋 Link copied to clipboard!");
+              }} sx={{ mt: 1 }}>
                 Copy Link
               </Button>
               <Typography variant="body2" mt={1}>
