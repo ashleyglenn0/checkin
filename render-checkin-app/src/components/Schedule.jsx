@@ -19,6 +19,7 @@ import {
   CssBaseline,
 } from "@mui/material";
 import { useTheme, createTheme, ThemeProvider } from "@mui/material/styles";
+import { useAuth } from "../context/AuthContext"; // ✅ Import Auth
 
 const renderTheme = createTheme({
   palette: {
@@ -37,20 +38,20 @@ const atlTheme = createTheme({
 });
 
 const Schedule = () => {
-  const [isAtlTechWeek, setIsAtlTechWeek] = useState(
-    JSON.parse(localStorage.getItem("isAtlTechWeek")) || false
-  );
+  const { user } = useAuth(); // ✅ Access authenticated user
   const [schedule, setSchedule] = useState([]);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
   const navigate = useNavigate();
   const isMobile = useMediaQuery("(max-width:600px)");
+
+  const isAtlTechWeek = user?.event === "ATL Tech Week"; // ✅ Derive from user
   const currentTheme = isAtlTechWeek ? atlTheme : renderTheme;
 
   useEffect(() => {
-    localStorage.setItem("isAtlTechWeek", JSON.stringify(isAtlTechWeek));
-  }, [isAtlTechWeek]);
+    if (!user) navigate("/admin/checkin");
+  }, [user, navigate]);
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -64,8 +65,8 @@ const Schedule = () => {
       setSchedule(scheduleSnapshot.docs.map((doc) => doc.data()));
     };
 
-    fetchSchedule();
-  }, [selectedDate, isAtlTechWeek]);
+    if (user) fetchSchedule();
+  }, [selectedDate, isAtlTechWeek, user]);
 
   const handleExport = () => {
     const headers = ["Name", "Shift", "Role"];
@@ -88,101 +89,93 @@ const Schedule = () => {
     <ThemeProvider theme={currentTheme}>
       <CssBaseline />
       <Box
-  sx={{
-    px: 2,
-    py: 6,
-    backgroundColor: currentTheme.palette.background.default,
-    display: "flex",
-    justifyContent: "center",
-  }}
->
-  <Box sx={{ width: "100%", maxWidth: 1000 }}>
-    {/* Header */}
-    <Stack
-      direction="row"
-      justifyContent="space-between"
-      alignItems="flex-end"
-      flexWrap="wrap"
-      mb={4}
-      spacing={2}
-    >
-      <Box>
-        <Typography variant="h4" color="text.primary" gutterBottom>
-          {isAtlTechWeek ? "ATL Tech Week Schedule" : "Render Schedule"}
-        </Typography>
-        <Typography variant="subtitle1" color="text.secondary">
-          Volunteers scheduled for {selectedDate}
-        </Typography>
-      </Box>
-
-      <Stack direction="row" spacing={2} alignItems="center">
-        <Button
-          variant="outlined"
-          onClick={() => setIsAtlTechWeek((prev) => !prev)}
-        >
-          Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
-        </Button>
-        <TextField
-          label="Select Date"
-          type="date"
-          size="small"
-          value={selectedDate}
-          onChange={(e) => setSelectedDate(e.target.value)}
-          InputLabelProps={{ shrink: true }}
-        />
-      </Stack>
-    </Stack>
-
-    {/* Table */}
-    <TableContainer component={Paper} elevation={3}>
-      <Table>
-        <TableHead>
-          <TableRow
-            sx={{
-              backgroundColor: currentTheme.palette.primary.main,
-            }}
-          >
-            <TableCell sx={{ color: "#fff" }}>Name</TableCell>
-            <TableCell sx={{ color: "#fff" }}>Shift</TableCell>
-            <TableCell sx={{ color: "#fff" }}>Role</TableCell>
-          </TableRow>
-        </TableHead>
-        <TableBody>
-          {schedule.length > 0 ? (
-            schedule.map((volunteer, index) => (
-              <TableRow key={index}>
-                <TableCell>
-                  {volunteer.first_name} {volunteer.last_name}
-                </TableCell>
-                <TableCell>{volunteer.shift}</TableCell>
-                <TableCell>{volunteer.role || "Volunteer"}</TableCell>
-              </TableRow>
-            ))
-          ) : (
-            <TableRow>
-              <TableCell colSpan={3}>No volunteers scheduled.</TableCell>
-            </TableRow>
-          )}
-        </TableBody>
-      </Table>
-    </TableContainer>
-
-    {/* Buttons */}
-    <Stack direction="row" spacing={2} mt={4} justifyContent="flex-start">
-      <Button
-        variant="contained"
-        color="primary"
-        onClick={() => navigate("/admin/dashboard")}
+        sx={{
+          px: 2,
+          py: 6,
+          backgroundColor: currentTheme.palette.background.default,
+          display: "flex",
+          justifyContent: "center",
+        }}
       >
-        ⬅ Back to Dashboard
-      </Button>
-      <Button variant="outlined" onClick={handleExport}>
-        📤 Export to CSV
-      </Button>
-    </Stack>
-  </Box>
-</Box>
+        <Box sx={{ width: "100%", maxWidth: 1000 }}>
+          {/* Header */}
+          <Stack
+            direction="row"
+            justifyContent="space-between"
+            alignItems="flex-end"
+            flexWrap="wrap"
+            mb={4}
+            spacing={2}
+          >
+            <Box>
+              <Typography variant="h4" color="text.primary" gutterBottom>
+                {isAtlTechWeek ? "ATL Tech Week Schedule" : "Render Schedule"}
+              </Typography>
+              <Typography variant="subtitle1" color="text.secondary">
+                Volunteers scheduled for {selectedDate}
+              </Typography>
+            </Box>
 
+            <Stack direction="row" spacing={2} alignItems="center">
+              {/* Only for view; toggle is no longer needed since we use user's event */}
+              <TextField
+                label="Select Date"
+                type="date"
+                size="small"
+                value={selectedDate}
+                onChange={(e) => setSelectedDate(e.target.value)}
+                InputLabelProps={{ shrink: true }}
+              />
+            </Stack>
+          </Stack>
+
+          {/* Table */}
+          <TableContainer component={Paper} elevation={3}>
+            <Table>
+              <TableHead>
+                <TableRow
+                  sx={{ backgroundColor: currentTheme.palette.primary.main }}
+                >
+                  <TableCell sx={{ color: "#fff" }}>Name</TableCell>
+                  <TableCell sx={{ color: "#fff" }}>Shift</TableCell>
+                  <TableCell sx={{ color: "#fff" }}>Role</TableCell>
+                </TableRow>
+              </TableHead>
+              <TableBody>
+                {schedule.length > 0 ? (
+                  schedule.map((volunteer, index) => (
+                    <TableRow key={index}>
+                      <TableCell>
+                        {volunteer.first_name} {volunteer.last_name}
+                      </TableCell>
+                      <TableCell>{volunteer.shift}</TableCell>
+                      <TableCell>{volunteer.role || "Volunteer"}</TableCell>
+                    </TableRow>
+                  ))
+                ) : (
+                  <TableRow>
+                    <TableCell colSpan={3}>No volunteers scheduled.</TableCell>
+                  </TableRow>
+                )}
+              </TableBody>
+            </Table>
+          </TableContainer>
+
+          {/* Buttons */}
+          <Stack direction="row" spacing={2} mt={4} justifyContent="flex-start">
+            <Button
+              variant="contained"
+              color="primary"
+              onClick={() => navigate("/admin/dashboard")}
+            >
+              ⬅ Back to Dashboard
+            </Button>
+            <Button variant="outlined" onClick={handleExport}>
+              📤 Export to CSV
+            </Button>
+          </Stack>
+        </Box>
+      </Box>
     </ThemeProvider>
   );
 };

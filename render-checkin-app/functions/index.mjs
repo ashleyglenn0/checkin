@@ -11,12 +11,43 @@ import fetch from "node-fetch";
 import corsLib from "cors";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
+import crypto from "crypto";
+import { onCall } from "firebase-functions/v2/https";
+import admin from "firebase-admin";
+
+admin.initializeApp();
 
 const cors = corsLib({ origin: true });
 
 const SLACK_WEBHOOK_URL = defineSecret("SLACK_WEBHOOK_URL");
 const SLACK_BOT_TOKEN = defineSecret("SLACK_BOT_TOKEN");
 const SLACK_CHANNEL_ID = defineSecret("SLACK_CHANNEL_ID");
+const TOKEN_SECRET = defineSecret("TOKEN_SECRET");
+
+function generateToken(data, secret) {
+  const payload = `${data.firstName}:${data.lastName}:${data.role}:${Date.now()}`;
+  const hash = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+  return `${hash}.${Buffer.from(payload).toString("base64")}`;
+}
+
+function verifyToken(token, secret) {
+  try {
+    const [hash, encodedPayload] = token.split(".");
+    const payload = Buffer.from(encodedPayload, "base64").toString();
+    const [firstName, lastName, role, timestamp] = payload.split(":");
+
+    const validHash = crypto.createHmac("sha256", secret).update(payload).digest("hex");
+    const isExpired = Date.now() - parseInt(timestamp, 10) > 1000 * 60 * 30; // 30 minutes
+
+    if (hash === validHash && !isExpired) {
+      return { firstName, lastName, role };
+    }
+
+    return null;
+  } catch {
+    return null;
+  }
+}
 
 export const sendSlackAlert = onRequest(
   { secrets: [SLACK_WEBHOOK_URL] },
@@ -117,6 +148,31 @@ export const getSlackMessages = onRequest(
     });
   }
 );
+
+export const createAuthToken = onCall({ secrets: [TOKEN_SECRET] }, async (req) => {
+  const { firstName, lastName, role } = req.data;
+
+  if (!firstName || !lastName || !role) {
+    throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+  }
+
+  const token = generateToken({ firstName, lastName, role }, TOKEN_SECRET.value());
+  return { token };
+});
+
+export const verifyAuthToken = onCall({ secrets: [TOKEN_SECRET] }, async (req) => {
+  const { token } = req.data;
+
+  const result = verifyToken(token, TOKEN_SECRET.value());
+
+  if (!result) {
+    throw new functions.https.HttpsError("unauthenticated", "Invalid or expired token.");
+  }
+
+  return result;
+});
+
+
 
 // Create and deploy your first functions
 // https://firebase.google.com/docs/functions/get-started

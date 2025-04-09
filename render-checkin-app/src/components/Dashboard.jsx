@@ -1,4 +1,3 @@
-// Admin Dashboard with Traffic Monitor and Full Logic Restored
 import React, { useState, useEffect } from "react";
 import { useSearchParams, useNavigate } from "react-router-dom";
 import { db } from "../config/firebaseConfig";
@@ -14,6 +13,7 @@ import {
   deleteDoc,
   setDoc,
   onSnapshot,
+  Timestamp,
 } from "firebase/firestore";
 import {
   Box,
@@ -30,6 +30,7 @@ import {
 import CircleIcon from "@mui/icons-material/Circle";
 import { useTheme, createTheme, ThemeProvider } from "@mui/material/styles";
 import SendAlertDialog from "./SendAlertDialog";
+import { useAuth } from "../context/AuthContext";
 
 const renderTheme = createTheme({
   palette: {
@@ -63,22 +64,22 @@ const Dashboard = () => {
   const [scheduledCount, setScheduledCount] = useState(0);
   const [alerts, setAlerts] = useState([]);
   const [openDialog, setOpenDialog] = useState(false);
-  const [isAdmin, setIsAdmin] = useState(false);
+  const [slackMessages, setSlackMessages] = useState([]);
+  const [trafficLevels, setTrafficLevels] = useState([]);
   const [newAlert, setNewAlert] = useState({
     message: "",
     severity: "info",
     audience: "admin-all",
   });
-  const [slackMessages, setSlackMessages] = useState([]);
-  const [trafficLevels, setTrafficLevels] = useState({});
 
+  const { user, logout } = useAuth();
   const navigate = useNavigate();
   const theme = useTheme();
   const isMobile = useMediaQuery(theme.breakpoints.down("sm"));
   const activeEvent = isAtlTechWeek ? "ATL Tech Week" : "Render";
 
   const handleLogout = () => {
-    localStorage.removeItem("adminInfo");
+    logout();
     navigate("/");
   };
 
@@ -89,10 +90,8 @@ const Dashboard = () => {
         createdAt: serverTimestamp(),
         event: activeEvent,
       };
-
       const docRef = await addDoc(collection(db, "alerts"), alertDoc);
       const addedDoc = await getDoc(docRef);
-
       setAlerts((prev) => [...prev, { id: docRef.id, ...addedDoc.data() }]);
       setOpenDialog(false);
 
@@ -108,7 +107,6 @@ const Dashboard = () => {
             body: JSON.stringify({ text: newAlert.message }),
           }
         );
-
         await res.text();
       }
     } catch (error) {
@@ -130,31 +128,63 @@ const Dashboard = () => {
     };
 
     const fetchStats = async () => {
+      const today = new Date();
+      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
+      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
+    
+      const startTimestamp = Timestamp.fromDate(startOfDay);
+      const endTimestamp = Timestamp.fromDate(endOfDay);
       const eventFilter = where("event", "==", activeEvent);
-
-      const checkInsSnap = await getDocs(
-        query(collection(db, "check_ins"), eventFilter)
-      );
-      const checkOutsSnap = await getDocs(
-        query(collection(db, "check_outs"), eventFilter)
-      );
-      const scheduledSnap = await getDocs(
-        query(collection(db, "scheduled_volunteers"), eventFilter)
-      );
-
-      setCheckIns(checkInsSnap.size);
-      setCheckOuts(checkOutsSnap.size);
-      setScheduledCount(scheduledSnap.size);
-      setNoShows(scheduledSnap.size - checkInsSnap.size);
+      const formattedDate = startOfDay.toLocaleDateString("en-US");
+    
+      try {
+        const checkInsSnap = await getDocs(
+          query(
+            collection(db, "check_ins"),
+            eventFilter,
+            where("status", "==", "Checked In"),
+            where("timestamp", ">=", startTimestamp),
+            where("timestamp", "<=", endTimestamp)
+          )
+        );
+    
+        const checkOutsSnap = await getDocs(
+          query(
+            collection(db, "check_ins"),
+            eventFilter,
+            where("status", "==", "Checked Out"),
+            where("timestamp", ">=", startTimestamp),
+            where("timestamp", "<=", endTimestamp)
+          )
+        );
+    
+        const scheduledSnap = await getDocs(
+          query(
+            collection(db, "scheduled_volunteers"),
+            where("date", "==", formattedDate),
+            where("isAtlTechWeek", "==", isAtlTechWeek)
+          )
+        );
+    
+        setCheckIns(checkInsSnap.size);
+        setCheckOuts(checkOutsSnap.size);
+        setScheduledCount(scheduledSnap.size);
+        if (scheduledSnap.size === 0) {
+          setNoShows(0);
+        } else {
+          const noShowCount = scheduledSnap.size - checkInsSnap.size;
+          setNoShows(noShowCount < 0 ? 0 : noShowCount);
+        }
+      } catch (err) {
+        console.error("❌ Error fetching dashboard stats:", err);
+      }
     };
+
     const fetchAlerts = async () => {
       try {
-        const today = new Date();
-        today.setHours(0, 0, 0, 0);
         const q = query(
           collection(db, "alerts"),
           where("event", "==", activeEvent)
-          // Optionally add timestamp range if needed: where("createdAt", ">=", today)
         );
         const snap = await getDocs(q);
         const fetchedAlerts = snap.docs.map((doc) => ({
@@ -224,18 +254,6 @@ const Dashboard = () => {
 
     return () => unsubscribe();
   }, [isAtlTechWeek]);
-
-  useEffect(() => {
-    const storedAdmin = JSON.parse(localStorage.getItem("adminInfo"));
-    const currentPath = window.location.pathname;
-  
-    if (storedAdmin?.role === "admin" || currentPath.includes("/admin")) {
-      setIsAdmin(true);
-    }
-  
-    const qrStaff = searchParams.get("staff");
-    if (qrStaff) setStaffMember(qrStaff);
-  }, [searchParams]);
 
   const currentTheme = isAtlTechWeek ? atlTheme : renderTheme;
   const coverageRate = scheduledCount > 0 ? Math.round((checkIns / scheduledCount) * 100) : 0;

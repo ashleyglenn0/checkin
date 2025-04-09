@@ -8,8 +8,13 @@ import TaskCheckInForm from "./components/TaskCheckInForm";
 import TaskDashboard from "./components/TaskDashboard";
 import AdminQRCode from "./components/AdminQRCodePage";
 import TeamLeadQRPage from "./components/TeamLeadQRPage";
-import RoleBasedAccess from "./components/RoleBasedAccess";
 import RecoverQRPage from "./components/RecoverQRPage";
+import { AuthProvider } from "./context/AuthContext";
+import PrivacyPolicy from "./components/PrivacyPolicy";
+
+// ✅ Import protected route wrappers
+import ProtectedAdminRoute from "./components/ProtectedAdminRoute";
+import ProtectedTeamLead from "./components/ProtectedTeamLead";
 
 const App = () => {
   useEffect(() => {
@@ -47,28 +52,88 @@ const App = () => {
       document.body.appendChild(installButton);
     });
   }, []);
-  console.log("🔥 This is the latest deployed build - April 7th, 1:30PM");
 
+  console.log("🔥 This is the latest deployed build - April 7th, 1:30PM");
 
   return (
     <Router>
-      <Routes>
-        <Route path="/" element={<CheckInForm />} />
-        <Route path="/task-check-in" element={<TaskCheckInForm />} />
-        <Route path="/teamlead-qr" element={<TeamLeadQRPage />} />
-        <Route path="/teamlead/task-checkin" element={<TaskCheckInForm />} />
-        <Route path="/recover-qr" element={<RecoverQRPage />} />
+      <AuthProvider>
+        <Routes>
+          {/* ✅ Public Routes */}
+          <Route path="/" element={<CheckInForm />} />
+          <Route path="/task-check-in" element={<TaskCheckInForm />} />
+          <Route path="/recover-qr" element={<RecoverQRPage />} />
+          <Route path="/privacy-policy" element={<PrivacyPolicy />} />
 
-        {/* Protected Admin Routes */}
-        <Route element={<RoleBasedAccess allowedRoles={["admin"]} />}>
-          <Route path="/admin/checkin" element={<CheckInForm showAdminButtons={true} />} />
-          <Route path="/admin/dashboard" element={<Dashboard />} />
-          <Route path="/admin/qr-code" element={<AdminQRCode />} />
-          <Route path="/admin/reports" element={<Reports />} />
-          <Route path="/admin/schedule" element={<Schedule />} />
-          <Route path="/admin/task-dashboard" element={<TaskDashboard />} />
-        </Route>
-      </Routes>
+          {/* ✅ Protected Team Lead Routes */}
+          <Route
+            path="/teamlead-qr"
+            element={
+              <ProtectedTeamLead>
+                <TeamLeadQRPage />
+              </ProtectedTeamLead>
+            }
+          />
+          <Route
+            path="/teamlead/task-checkin"
+            element={
+              <ProtectedTeamLead>
+                <TaskCheckInForm />
+              </ProtectedTeamLead>
+            }
+          />
+
+          {/* ✅ Protected Admin Routes */}
+          <Route
+            path="/admin/checkin"
+            element={
+              <ProtectedAdminRoute>
+                <CheckInForm showAdminButtons />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin/dashboard"
+            element={
+              <ProtectedAdminRoute>
+                <Dashboard />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin/qr-code"
+            element={
+              <ProtectedAdminRoute>
+                <AdminQRCode />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin/reports"
+            element={
+              <ProtectedAdminRoute>
+                <Reports />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin/schedule"
+            element={
+              <ProtectedAdminRoute>
+                <Schedule />
+              </ProtectedAdminRoute>
+            }
+          />
+          <Route
+            path="/admin/task-dashboard"
+            element={
+              <ProtectedAdminRoute>
+                <TaskDashboard />
+              </ProtectedAdminRoute>
+            }
+          />
+        </Routes>
+      </AuthProvider>
     </Router>
   );
 };

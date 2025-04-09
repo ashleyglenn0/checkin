@@ -1,4 +1,3 @@
-// Updated TaskDashboard.js with themed reassignment dialog
 import React, { useState, useEffect } from "react";
 import { useNavigate } from "react-router-dom";
 import {
@@ -40,6 +39,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PageLayout from "../components/PageLayout";
+import { useAuth } from "../context/AuthContext"; // ✅ Import useAuth
 
 const renderTheme = createTheme({
   palette: {
@@ -60,38 +60,29 @@ const atlTheme = createTheme({
 });
 
 const TaskDashboard = () => {
+  const { user } = useAuth(); // ✅ Grab user context
+  const navigate = useNavigate();
+  const db = getFirestore();
+
   const [taskCheckIns, setTaskCheckIns] = useState({});
   const [selectedEvent, setSelectedEvent] = useState("ATL Tech Week");
-  const [selectedDate, setSelectedDate] = useState(
-    () => new Date().toISOString().split("T")[0]
+  const [selectedDate, setSelectedDate] = useState(() =>
+    new Date().toISOString().split("T")[0]
   );
   const [reassignDialogOpen, setReassignDialogOpen] = useState(false);
   const [selectedVolunteer, setSelectedVolunteer] = useState(null);
   const [newTask, setNewTask] = useState("");
 
-  const navigate = useNavigate();
-  const db = getFirestore();
+  useEffect(() => {
+    if (!user) {
+      navigate("/"); // ✅ Secure route
+      return;
+    }
 
-  const tasks =
-    selectedEvent === "ATL Tech Week"
-      ? [
-          "Registration",
-          "Room Setup",
-          "Tech Support",
-          "Food Service",
-          "Stage Crew",
-          "General Support",
-        ]
-      : [
-          "Registration",
-          "Swag Distribution",
-          "Tech Support",
-          "Check-in Desk",
-          "Room Setup",
-          "General Support",
-        ];
-
-  const theme = selectedEvent === "ATL Tech Week" ? atlTheme : renderTheme;
+    if (user?.event) {
+      setSelectedEvent(user.event);
+    }
+  }, [user, navigate]);
 
   useEffect(() => {
     if (!selectedEvent || !selectedDate) return;
@@ -117,6 +108,27 @@ const TaskDashboard = () => {
 
     return () => unsubscribe();
   }, [selectedEvent, selectedDate, db]);
+
+  const tasks =
+    selectedEvent === "ATL Tech Week"
+      ? [
+          "Registration",
+          "Room Setup",
+          "Tech Support",
+          "Food Service",
+          "Stage Crew",
+          "General Support",
+        ]
+      : [
+          "Registration",
+          "Swag Distribution",
+          "Tech Support",
+          "Check-in Desk",
+          "Room Setup",
+          "General Support",
+        ];
+
+  const theme = selectedEvent === "ATL Tech Week" ? atlTheme : renderTheme;
 
   const calculateTimeSpent = (checkinTime) => {
     if (!checkinTime) return "-";

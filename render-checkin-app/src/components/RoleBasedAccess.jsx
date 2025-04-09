@@ -1,28 +1,55 @@
+// RoleBasedAccess.jsx
+import React, { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { useState, useEffect } from "react";
+import { httpsCallable } from "firebase/functions";
+import { functions } from "../config/firebaseConfig";
+import { getTokenFromSession } from "../utils/tokenHelpers"; // We'll make this
+import CircularProgress from "@mui/material/CircularProgress";
+import Box from "@mui/material/Box";
 
 const RoleBasedAccess = ({ allowedRoles }) => {
-  const [userRole, setUserRole] = useState(null);
-  const [isLoaded, setIsLoaded] = useState(false);
+  const [loading, setLoading] = useState(true);
+  const [isAuthorized, setIsAuthorized] = useState(false);
 
   useEffect(() => {
-    // Try pulling from both possible keys in localStorage
-    const storedUser =
-      JSON.parse(localStorage.getItem("userInfo")) ||
-      JSON.parse(localStorage.getItem("adminInfo"));
+    const verifyAccess = async () => {
+      const token = getTokenFromSession();
 
-    if (storedUser?.role) {
-      setUserRole(storedUser.role.toLowerCase());
-    } else {
-      setUserRole("guest"); // fallback role
-    }
+      if (!token) {
+        setIsAuthorized(false);
+        setLoading(false);
+        return;
+      }
 
-    setIsLoaded(true); // Trigger render after hydration
-  }, []);
+      try {
+        const verifyAuthToken = httpsCallable(functions, "verifyAuthToken");
+        const result = await verifyAuthToken({ token });
 
-  if (!isLoaded) return <p>Loading access...</p>;
+        if (result?.data?.role && allowedRoles.includes(result.data.role.toLowerCase())) {
+          setIsAuthorized(true);
+        } else {
+          setIsAuthorized(false);
+        }
+      } catch (err) {
+        console.error("🔒 Token verification failed:", err);
+        setIsAuthorized(false);
+      }
 
-  return allowedRoles.includes(userRole) ? <Outlet /> : <Navigate to="/" />;
+      setLoading(false);
+    };
+
+    verifyAccess();
+  }, [allowedRoles]);
+
+  if (loading) {
+    return (
+      <Box sx={{ mt: 4, textAlign: "center" }}>
+        <CircularProgress color="primary" />
+      </Box>
+    );
+  }
+
+  return isAuthorized ? <Outlet /> : <Navigate to="/" replace />;
 };
 
 export default RoleBasedAccess;

@@ -1,13 +1,11 @@
-// New file: TeamLeadQRPage.js
 import React, { useState, useEffect } from "react";
-import { useSearchParams, useNavigate } from "react-router-dom";
+import { useNavigate, useSearchParams } from "react-router-dom";
 import {
   getFirestore,
   collection,
   query,
   where,
   getDocs,
-  Timestamp,
 } from "firebase/firestore";
 import { QRCodeCanvas } from "qrcode.react";
 import {
@@ -20,6 +18,7 @@ import {
 } from "@mui/material";
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import PageLayout from "../components/PageLayout";
+import { useAuth } from "../context/AuthContext";
 
 const renderTheme = createTheme({
   palette: {
@@ -40,8 +39,9 @@ const atlTheme = createTheme({
 });
 
 const TeamLeadQRPage = () => {
-  const [searchParams] = useSearchParams();
+  const { user } = useAuth();
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
   const db = getFirestore();
 
   const [task, setTask] = useState("");
@@ -51,45 +51,28 @@ const TeamLeadQRPage = () => {
   const [overdueReturns, setOverdueReturns] = useState([]);
   const [coveragePercentage, setCoveragePercentage] = useState(null);
 
-  const firstName = searchParams.get("firstName") || "";
-  const lastName = searchParams.get("lastName") || "";
-
-  const theme = event === "ATL Tech Week" ? atlTheme : renderTheme;
+  useEffect(() => {
+    if (!user || user.role !== "teamlead") {
+      navigate("/");
+      return;
+    }
+  
+    const resolvedTask = user.task || user.assignedTask || searchParams.get("task") || "";
+    const resolvedEvent = user.event || searchParams.get("event") || "";
+  
+    setTask(resolvedTask);
+    setEvent(resolvedEvent);
+  }, [user, navigate, searchParams]);
 
   useEffect(() => {
-    const fetchTeamLeadInfo = async () => {
-      if (!firstName || !lastName) return;
-
-      const q = query(
-        collection(db, "users"),
-        where("first_name", "==", firstName),
-        where("last_name", "==", lastName),
-        where("role", "==", "teamLead")
-      );
-
-      const querySnapshot = await getDocs(q);
-      if (!querySnapshot.empty) {
-        const data = querySnapshot.docs[0].data();
-        setTask(data.assignedTask);
-        setEvent(data.event);
-      } else {
-        setTask(searchParams.get("task") || "Unknown Task");
-        setEvent(searchParams.get("event") || "Unknown Event");
-      }
-    };
-
-    fetchTeamLeadInfo();
-  }, [db, firstName, lastName, searchParams]);
-
-  useEffect(() => {
-    if (!event || !task) return;
+    if (!user || !user.firstName || !user.lastName || !task || !event) return;
 
     const fetchAlertsAndStats = async () => {
       const alertsRef = collection(db, "alerts");
       const q = query(alertsRef, where("event", "==", event));
       const snapshot = await getDocs(q);
 
-      const localKey = `dismissedTeamLeadAlerts_${firstName}_${lastName}`;
+      const localKey = `dismissedTeamLeadAlerts_${user.firstName}_${user.lastName}`;
       const dismissed = JSON.parse(localStorage.getItem(localKey) || "[]");
 
       const filtered = snapshot.docs
@@ -97,9 +80,7 @@ const TeamLeadQRPage = () => {
         .filter(
           (alert) =>
             !dismissed.includes(alert.id) &&
-            ["everyone", "teamlead-all", "teamlead-direct"].includes(
-              alert.audience
-            ) &&
+            ["everyone", "teamlead-all", "teamlead-direct"].includes(alert.audience) &&
             (alert.audience !== "teamlead-direct" || alert.task === task)
         );
 
@@ -163,18 +144,19 @@ const TeamLeadQRPage = () => {
     fetchAlertsAndStats();
     const interval = setInterval(fetchAlertsAndStats, 60000);
     return () => clearInterval(interval);
-  }, [event, task]);
+  }, [db, task, event, user]);
 
   const handleDismissAlert = (id) => {
-    setTeamLeadAlerts((prev) => prev.filter((a) => a.id !== id));
-    const localKey = `dismissedTeamLeadAlerts_${firstName}_${lastName}`;
+    const localKey = `dismissedTeamLeadAlerts_${user.firstName}_${user.lastName}`;
     const dismissed = JSON.parse(localStorage.getItem(localKey) || "[]");
     localStorage.setItem(localKey, JSON.stringify([...dismissed, id]));
+    setTeamLeadAlerts((prev) => prev.filter((a) => a.id !== id));
   };
 
-  const appUrl = "https://volunteercheckin-3659e.web.app/task-check-in";
+  const theme = event === "ATL Tech Week" ? atlTheme : renderTheme;
+  const appUrl = window.location.origin + "/task-check-in";
   const qrValue = `${appUrl}?teamLead=${encodeURIComponent(
-    `${firstName} ${lastName}`
+    `${user?.firstName || ""} ${user?.lastName || ""}`
   )}&task=${encodeURIComponent(task)}&event=${encodeURIComponent(event)}`;
 
   return (
@@ -182,7 +164,7 @@ const TeamLeadQRPage = () => {
       <CssBaseline />
       <PageLayout centered>
         <Typography variant="h5" gutterBottom>
-          Welcome, {firstName} {lastName}
+          Welcome, {user?.firstName} {user?.lastName}
         </Typography>
         <Typography>
           Event: <strong>{event}</strong>
@@ -243,13 +225,7 @@ const TeamLeadQRPage = () => {
             <Button
               variant="outlined"
               onClick={() =>
-                navigate(
-                  `/teamlead/task-checkin?task=${encodeURIComponent(
-                    task
-                  )}&teamLead=${encodeURIComponent(
-                    `${firstName} ${lastName}`
-                  )}&event=${encodeURIComponent(event)}&manual=true`
-                )
+                navigate(`/teamlead/task-checkin?task=${encodeURIComponent(task)}&teamLead=${encodeURIComponent(`${user?.firstName || ""} ${user?.lastName || ""}`)}&event=${encodeURIComponent(event)}&manual=true`)
               }
             >
               Manual Check-In

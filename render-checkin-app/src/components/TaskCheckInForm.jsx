@@ -21,6 +21,7 @@ import {
 } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import PageLayout from "../components/PageLayout";
+import { useAuth } from "../context/AuthContext"; // ✅ Import Auth
 
 const renderTheme = createTheme({
   palette: {
@@ -41,6 +42,7 @@ const atlTheme = createTheme({
 });
 
 const TaskCheckInForm = () => {
+  const { user } = useAuth(); // ✅ Access user
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const isTeamLeadPath = location.pathname.includes("/teamlead");
@@ -59,11 +61,15 @@ const TaskCheckInForm = () => {
   const db = getFirestore();
 
   useEffect(() => {
+    if (!user) {
+      navigate("/"); // ✅ Require authentication
+    }
+
     setTask(searchParams.get("task") || "");
     setTeamLead(searchParams.get("teamLead") || "");
-    setEvent(searchParams.get("event") || "");
+    setEvent(user?.event || searchParams.get("event") || "");
     setShowBackButton(true);
-  }, [searchParams]);
+  }, [searchParams, user, navigate]);
 
   const verifyAdminCheckIn = async (first, last, minWaitMinutes = 1) => {
     const startOfDay = Timestamp.fromDate(new Date(new Date().setHours(0, 0, 0, 0)));
@@ -118,7 +124,8 @@ const TaskCheckInForm = () => {
         last_name: lastName,
         task,
         status,
-        time: timestamp,
+        checkinTime: timestamp,
+        checkoutTime: null,
         teamLead,
         event,
       });

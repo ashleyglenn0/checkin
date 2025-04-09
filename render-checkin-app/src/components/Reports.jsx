@@ -22,6 +22,7 @@ import { useNavigate } from "react-router-dom";
 import { db } from "../config/firebaseConfig";
 import { collection, query, where, getDocs, Timestamp } from "firebase/firestore";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { useAuth } from "../context/AuthContext"; // ✅ Auth context
 
 const renderTheme = createTheme({
   palette: {
@@ -49,10 +50,16 @@ const Reports = () => {
   const [noShows, setNoShows] = useState([]);
   const [roleDistribution, setRoleDistribution] = useState([]);
   const [shiftCoverage, setShiftCoverage] = useState([]);
-  const [isAtlTechWeek, setIsAtlTechWeek] = useState(
-    JSON.parse(localStorage.getItem("isAtlTechWeek")) || false
-  );
+  const [isAtlTechWeek, setIsAtlTechWeek] = useState(false);
+  const { user, logout } = useAuth(); // ✅ useAuth hook
   const navigate = useNavigate();
+
+  useEffect(() => {
+    if (!user) {
+      navigate("/admin/checkin");
+    }
+    setIsAtlTechWeek(user?.event === "ATL Tech Week");
+  }, [user]);
 
   const currentTheme = isAtlTechWeek ? atlTheme : renderTheme;
 
@@ -144,8 +151,8 @@ const Reports = () => {
   };
 
   useEffect(() => {
-    fetchData();
-  }, [selectedDate, isAtlTechWeek]);
+    if (user) fetchData();
+  }, [selectedDate, isAtlTechWeek, user]);
 
   const getCurrentTabData = () => {
     switch (activeTab) {
@@ -207,6 +214,9 @@ const Reports = () => {
             />
             <Button variant="outlined" onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
               Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
+            </Button>
+            <Button variant="outlined" onClick={logout}>
+              Log Out
             </Button>
           </Stack>
 

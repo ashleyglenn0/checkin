@@ -9,6 +9,7 @@ import {
   CssBaseline
 } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
+import { useAuth } from "../context/AuthContext"; // ✅ AuthContext
 
 const renderTheme = createTheme({
   palette: {
@@ -21,17 +22,17 @@ const renderTheme = createTheme({
 
 const AdminQRPage = () => {
   const navigate = useNavigate();
+  const { user } = useAuth(); // ✅ grab admin from context
   const [adminInfo, setAdminInfo] = useState(null);
 
   useEffect(() => {
-    const storedAdmin = JSON.parse(localStorage.getItem("adminInfo"));
-    if (storedAdmin?.role === "admin") {
-      setAdminInfo(storedAdmin);
+    if (user?.role === "admin") {
+      setAdminInfo(user);
     } else {
       alert("⚠️ No admin found. Please check in as an admin first.");
       navigate("/admin/checkin");
     }
-  }, [navigate]);
+  }, [user, navigate]);
 
   if (!adminInfo) return null;
 
