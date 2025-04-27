@@ -15,11 +15,13 @@ import {
   TableRow,
   Stack,
   TextField,
+  ToggleButton,
+  ToggleButtonGroup,
   useMediaQuery,
   CssBaseline,
 } from "@mui/material";
 import { useTheme, createTheme, ThemeProvider } from "@mui/material/styles";
-import { useAuth } from "../context/AuthContext"; // ✅ Import Auth
+import { useAuth } from "../context/AuthContext";
 
 const renderTheme = createTheme({
   palette: {
@@ -38,20 +40,29 @@ const atlTheme = createTheme({
 });
 
 const Schedule = () => {
-  const { user } = useAuth(); // ✅ Access authenticated user
+  const { user } = useAuth();
+  const navigate = useNavigate();
+  const isMobile = useMediaQuery("(max-width:600px)");
+
   const [schedule, setSchedule] = useState([]);
   const [selectedDate, setSelectedDate] = useState(
     new Date().toISOString().split("T")[0]
   );
-  const navigate = useNavigate();
-  const isMobile = useMediaQuery("(max-width:600px)");
 
-  const isAtlTechWeek = user?.event === "ATL Tech Week"; // ✅ Derive from user
+  const [isAtlTechWeek, setIsAtlTechWeek] = useState(() => {
+    const stored = localStorage.getItem("isAtlTechWeek");
+    return stored ? JSON.parse(stored) : user?.event === "ATL Tech Week";
+  });
+
   const currentTheme = isAtlTechWeek ? atlTheme : renderTheme;
 
   useEffect(() => {
     if (!user) navigate("/admin/checkin");
   }, [user, navigate]);
+
+  useEffect(() => {
+    localStorage.setItem("isAtlTechWeek", JSON.stringify(isAtlTechWeek));
+  }, [isAtlTechWeek]);
 
   useEffect(() => {
     const fetchSchedule = async () => {
@@ -65,8 +76,8 @@ const Schedule = () => {
       setSchedule(scheduleSnapshot.docs.map((doc) => doc.data()));
     };
 
-    if (user) fetchSchedule();
-  }, [selectedDate, isAtlTechWeek, user]);
+    fetchSchedule();
+  }, [selectedDate, isAtlTechWeek]);
 
   const handleExport = () => {
     const headers = ["Name", "Shift", "Role"];
@@ -116,8 +127,19 @@ const Schedule = () => {
               </Typography>
             </Box>
 
-            <Stack direction="row" spacing={2} alignItems="center">
-              {/* Only for view; toggle is no longer needed since we use user's event */}
+            <Stack direction="row" spacing={2} alignItems="center" flexWrap="wrap">
+              <ToggleButtonGroup
+                value={isAtlTechWeek ? "atl" : "render"}
+                exclusive
+                onChange={(e, val) => {
+                  if (val) setIsAtlTechWeek(val === "atl");
+                }}
+                color="primary"
+              >
+                <ToggleButton value="render">Render</ToggleButton>
+                <ToggleButton value="atl">ATL Tech Week</ToggleButton>
+              </ToggleButtonGroup>
+
               <TextField
                 label="Select Date"
                 type="date"
@@ -133,9 +155,7 @@ const Schedule = () => {
           <TableContainer component={Paper} elevation={3}>
             <Table>
               <TableHead>
-                <TableRow
-                  sx={{ backgroundColor: currentTheme.palette.primary.main }}
-                >
+                <TableRow sx={{ backgroundColor: currentTheme.palette.primary.main }}>
                   <TableCell sx={{ color: "#fff" }}>Name</TableCell>
                   <TableCell sx={{ color: "#fff" }}>Shift</TableCell>
                   <TableCell sx={{ color: "#fff" }}>Role</TableCell>

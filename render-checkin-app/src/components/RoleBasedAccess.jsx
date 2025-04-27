@@ -1,9 +1,7 @@
-// RoleBasedAccess.jsx
+// components/RoleBasedAccess.jsx
 import React, { useEffect, useState } from "react";
 import { Navigate, Outlet } from "react-router-dom";
-import { httpsCallable } from "firebase/functions";
-import { functions } from "../config/firebaseConfig";
-import { getTokenFromSession } from "../utils/tokenHelpers"; // We'll make this
+import { getTokenFromSession } from "../utils/tokenHelpers"; 
 import CircularProgress from "@mui/material/CircularProgress";
 import Box from "@mui/material/Box";
 
@@ -22,10 +20,21 @@ const RoleBasedAccess = ({ allowedRoles }) => {
       }
 
       try {
-        const verifyAuthToken = httpsCallable(functions, "verifyAuthToken");
-        const result = await verifyAuthToken({ token });
+        const response = await fetch("https://us-central1-volunteercheckin-3659e.cloudfunctions.net/verifyAuthToken", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token }),
+        });
 
-        if (result?.data?.role && allowedRoles.includes(result.data.role.toLowerCase())) {
+        if (!response.ok) {
+          throw new Error("Token verification failed");
+        }
+
+        const result = await response.json();
+
+        if (result?.role && allowedRoles.includes(result.role.toLowerCase())) {
           setIsAuthorized(true);
         } else {
           setIsAuthorized(false);

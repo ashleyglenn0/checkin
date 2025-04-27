@@ -1,14 +1,11 @@
 // components/ProtectedAdminRoute.jsx
 import React, { useEffect, useState } from "react";
 import { Navigate } from "react-router-dom";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "../config/firebaseConfig"; // ✅ You were missing this
 import { getTokenFromSession } from "../utils/tokenHelpers";
 import CircularProgress from "@mui/material/CircularProgress";
 import Box from "@mui/material/Box";
 
 const ProtectedAdminRoute = ({ children }) => {
-  const functions = getFunctions(app); // ✅ Now works since we have `app`
   const [authorized, setAuthorized] = useState(false);
   const [loading, setLoading] = useState(true);
 
@@ -23,10 +20,21 @@ const ProtectedAdminRoute = ({ children }) => {
       }
 
       try {
-        const verifyAuthToken = httpsCallable(functions, "verifyAuthToken");
-        const result = await verifyAuthToken({ token });
+        const response = await fetch("https://us-central1-volunteercheckin-3659e.cloudfunctions.net/verifyAuthToken", {
+          method: "POST",
+          headers: {
+            "Content-Type": "application/json",
+          },
+          body: JSON.stringify({ token }),
+        });
 
-        if (result?.data?.role === "admin") {
+        if (!response.ok) {
+          throw new Error("Token verification failed");
+        }
+
+        const result = await response.json();
+
+        if (result?.role === "admin") {
           setAuthorized(true);
         } else {
           setAuthorized(false);

@@ -39,7 +39,7 @@ import {
 } from "@mui/material";
 import ExpandMoreIcon from "@mui/icons-material/ExpandMore";
 import PageLayout from "../components/PageLayout";
-import { useAuth } from "../context/AuthContext"; // ✅ Import useAuth
+import { useAuth } from "../context/AuthContext";
 
 const renderTheme = createTheme({
   palette: {
@@ -60,12 +60,16 @@ const atlTheme = createTheme({
 });
 
 const TaskDashboard = () => {
-  const { user } = useAuth(); // ✅ Grab user context
+  const { user } = useAuth();
   const navigate = useNavigate();
   const db = getFirestore();
 
+  const initialEvent =
+    user?.event ||
+    (localStorage.getItem("isAtlTechWeek") === "true" ? "ATL Tech Week" : "Render");
+
   const [taskCheckIns, setTaskCheckIns] = useState({});
-  const [selectedEvent, setSelectedEvent] = useState("ATL Tech Week");
+  const [selectedEvent, setSelectedEvent] = useState(initialEvent);
   const [selectedDate, setSelectedDate] = useState(() =>
     new Date().toISOString().split("T")[0]
   );
@@ -75,12 +79,8 @@ const TaskDashboard = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate("/"); // ✅ Secure route
+      navigate("/");
       return;
-    }
-
-    if (user?.event) {
-      setSelectedEvent(user.event);
     }
   }, [user, navigate]);
 
@@ -225,16 +225,12 @@ const TaskDashboard = () => {
                           </TableCell>
                           <TableCell>{volunteer.teamLead}</TableCell>
                           <TableCell>
-                            {new Date(
-                              volunteer.checkinTime
-                            ).toLocaleTimeString([], {
+                            {new Date(volunteer.checkinTime).toLocaleTimeString([], {
                               hour: "2-digit",
                               minute: "2-digit",
                             })}
                           </TableCell>
-                          <TableCell>
-                            {calculateTimeSpent(volunteer.checkinTime)}
-                          </TableCell>
+                          <TableCell>{calculateTimeSpent(volunteer.checkinTime)}</TableCell>
                           <TableCell>
                             <Button
                               variant="outlined"
@@ -250,9 +246,7 @@ const TaskDashboard = () => {
                   </Table>
                 </TableContainer>
               ) : (
-                <Typography variant="body2">
-                  No check-ins for this task.
-                </Typography>
+                <Typography variant="body2">No check-ins for this task.</Typography>
               )}
             </AccordionDetails>
           </Accordion>

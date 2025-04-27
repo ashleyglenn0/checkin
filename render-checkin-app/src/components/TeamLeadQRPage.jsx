@@ -19,6 +19,8 @@ import {
 import { createTheme, ThemeProvider } from "@mui/material/styles";
 import PageLayout from "../components/PageLayout";
 import { useAuth } from "../context/AuthContext";
+import PinkPeachIcon from "../assets/PinkPeachIcon.png";
+import ATWLogo from "../assets/ATWLogo.jpg";
 
 const renderTheme = createTheme({
   palette: {
@@ -32,9 +34,20 @@ const renderTheme = createTheme({
 const atlTheme = createTheme({
   palette: {
     mode: "light",
-    background: { default: "#e0f7f9", paper: "#ffffff" },
-    primary: { main: "#5ec3cc" },
-    text: { primary: "#004d61" },
+    background: {
+      default: "#f5f5f5",
+      paper: "#ffffff"
+    },
+    primary: {
+      main: "#ffb89e"
+    },
+    text: {
+      primary: "#4f2b91",
+      secondary: "#2b2b36"
+    },
+    secondary: {
+      main: "#68dcaf"
+    },
   },
 });
 
@@ -56,10 +69,11 @@ const TeamLeadQRPage = () => {
       navigate("/");
       return;
     }
-  
-    const resolvedTask = user.task || user.assignedTask || searchParams.get("task") || "";
+
+    const resolvedTask =
+      user.task || user.assignedTask || searchParams.get("task") || "";
     const resolvedEvent = user.event || searchParams.get("event") || "";
-  
+
     setTask(resolvedTask);
     setEvent(resolvedEvent);
   }, [user, navigate, searchParams]);
@@ -80,7 +94,9 @@ const TeamLeadQRPage = () => {
         .filter(
           (alert) =>
             !dismissed.includes(alert.id) &&
-            ["everyone", "teamlead-all", "teamlead-direct"].includes(alert.audience) &&
+            ["everyone", "teamlead-all", "teamlead-direct"].includes(
+              alert.audience
+            ) &&
             (alert.audience !== "teamlead-direct" || alert.task === task)
         );
 
@@ -163,6 +179,13 @@ const TeamLeadQRPage = () => {
     <ThemeProvider theme={theme}>
       <CssBaseline />
       <PageLayout centered>
+        <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+          <img
+            src={event ? ATWLogo : PinkPeachIcon}
+            alt="Event Logo"
+            style={{ height: "60px", width: "auto" }}
+          />
+        </Box>
         <Typography variant="h5" gutterBottom>
           Welcome, {user?.firstName} {user?.lastName}
         </Typography>
@@ -176,7 +199,10 @@ const TeamLeadQRPage = () => {
         <Box sx={{ my: 3 }}>
           <Typography variant="h6">📊 Task Overview</Typography>
           <Typography>
-            ✅ Current Coverage: {coveragePercentage !== null ? `${coveragePercentage}%` : "Loading..."}
+            ✅ Current Coverage:{" "}
+            {coveragePercentage !== null
+              ? `${coveragePercentage}%`
+              : "Loading..."}
           </Typography>
 
           {coveragePercentage < 60 && (
@@ -225,7 +251,13 @@ const TeamLeadQRPage = () => {
             <Button
               variant="outlined"
               onClick={() =>
-                navigate(`/teamlead/task-checkin?task=${encodeURIComponent(task)}&teamLead=${encodeURIComponent(`${user?.firstName || ""} ${user?.lastName || ""}`)}&event=${encodeURIComponent(event)}&manual=true`)
+                navigate(
+                  `/teamlead/task-checkin?task=${encodeURIComponent(
+                    task
+                  )}&teamLead=${encodeURIComponent(
+                    `${user?.firstName || ""} ${user?.lastName || ""}`
+                  )}&event=${encodeURIComponent(event)}&manual=true`
+                )
               }
             >
               Manual Check-In

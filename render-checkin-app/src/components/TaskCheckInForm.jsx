@@ -21,7 +21,7 @@ import {
 } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import PageLayout from "../components/PageLayout";
-import { useAuth } from "../context/AuthContext"; // ✅ Import Auth
+import { useAuth } from "../context/AuthContext";
 
 const renderTheme = createTheme({
   palette: {
@@ -42,7 +42,7 @@ const atlTheme = createTheme({
 });
 
 const TaskCheckInForm = () => {
-  const { user } = useAuth(); // ✅ Access user
+  const { user } = useAuth();
   const [searchParams] = useSearchParams();
   const location = useLocation();
   const isTeamLeadPath = location.pathname.includes("/teamlead");
@@ -62,7 +62,8 @@ const TaskCheckInForm = () => {
 
   useEffect(() => {
     if (!user) {
-      navigate("/"); // ✅ Require authentication
+      navigate("/");
+      return;
     }
 
     setTask(searchParams.get("task") || "");
@@ -122,12 +123,12 @@ const TaskCheckInForm = () => {
       await setDoc(doc(db, "task_checkins", taskCheckinId), {
         first_name: firstName,
         last_name: lastName,
-        task,
+        task: task || "Unknown",
         status,
         checkinTime: timestamp,
         checkoutTime: null,
-        teamLead,
-        event,
+        teamLead: teamLead || "Unknown",
+        event: event || "Render",
       });
 
       localStorage.setItem(

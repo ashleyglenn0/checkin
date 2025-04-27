@@ -1,14 +1,11 @@
 // src/context/AuthContext.js
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { getFunctions, httpsCallable } from "firebase/functions";
-import { app } from "../config/firebaseConfig";
 
 const AuthContext = createContext();
 
 export const AuthProvider = ({ children }) => {
   const [user, setUser] = useState(null);
   const [token, setToken] = useState(null);
-  const functions = getFunctions(app);
 
   useEffect(() => {
     const storedToken = sessionStorage.getItem("authToken");
@@ -19,9 +16,20 @@ export const AuthProvider = ({ children }) => {
 
   const verifyToken = async (token) => {
     try {
-      const verifyAuthToken = httpsCallable(functions, "verifyAuthToken");
-      const response = await verifyAuthToken({ token });
-      setUser(response.data);
+      const response = await fetch("https://us-central1-volunteercheckin-3659e.cloudfunctions.net/verifyAuthToken", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify({ token }),
+      });
+
+      if (!response.ok) {
+        throw new Error("Token verification failed");
+      }
+
+      const data = await response.json();
+      setUser(data); // ✅ data contains { firstName, lastName, role }
       setToken(token);
     } catch (err) {
       console.warn("⚠️ Invalid or expired token. Clearing session.");
@@ -31,9 +39,21 @@ export const AuthProvider = ({ children }) => {
 
   const login = async (userData) => {
     try {
-      const createAuthToken = httpsCallable(functions, "createAuthToken");
-      const response = await createAuthToken(userData);
-      const newToken = response.data.token;
+      const response = await fetch("https://us-central1-volunteercheckin-3659e.cloudfunctions.net/createAuthToken", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+        },
+        body: JSON.stringify(userData),
+      });
+
+      if (!response.ok) {
+        throw new Error("Token generation failed");
+      }
+
+      const data = await response.json();
+      const newToken = data.token;
+
       setUser(userData);
       setToken(newToken);
       sessionStorage.setItem("authToken", newToken);

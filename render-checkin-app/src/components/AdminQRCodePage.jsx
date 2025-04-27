@@ -1,15 +1,10 @@
 import React, { useEffect, useState } from "react";
 import { useNavigate } from "react-router-dom";
 import { QRCodeCanvas } from "qrcode.react";
-import {
-  Box,
-  Typography,
-  Button,
-  Container,
-  CssBaseline
-} from "@mui/material";
+import { Box, Typography, Button, Container, CssBaseline } from "@mui/material";
 import { ThemeProvider, createTheme } from "@mui/material/styles";
 import { useAuth } from "../context/AuthContext"; // ✅ AuthContext
+import PinkPeachIcon from "../assets/PinkPeachIcon.png"; // Update path if needed
 
 const renderTheme = createTheme({
   palette: {
@@ -64,6 +59,13 @@ const AdminQRPage = () => {
             textAlign: "center",
           }}
         >
+          <Box sx={{ display: "flex", justifyContent: "center", mb: 2 }}>
+            <img
+              src={PinkPeachIcon}
+              alt="Event Logo"
+              style={{ height: "60px", width: "auto" }}
+            />
+          </Box>
           <Typography variant="h5" gutterBottom color="textPrimary">
             Welcome, {adminInfo.firstName} {adminInfo.lastName}
           </Typography>
@@ -78,7 +80,10 @@ const AdminQRPage = () => {
             </Typography>
           </Box>
 
-          <Button variant="contained" onClick={() => navigate("/admin/checkin")}>
+          <Button
+            variant="contained"
+            onClick={() => navigate("/admin/checkin")}
+          >
             Back to Check-In
           </Button>
         </Container>

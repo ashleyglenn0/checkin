@@ -12,7 +12,6 @@ import corsLib from "cors";
 import { onRequest } from "firebase-functions/v2/https";
 import { defineSecret } from "firebase-functions/params";
 import crypto from "crypto";
-import { onCall } from "firebase-functions/v2/https";
 import admin from "firebase-admin";
 
 admin.initializeApp();
@@ -149,28 +148,38 @@ export const getSlackMessages = onRequest(
   }
 );
 
-export const createAuthToken = onCall({ secrets: [TOKEN_SECRET] }, async (req) => {
-  const { firstName, lastName, role } = req.data;
+export const createAuthToken = onRequest(
+  { secrets: [TOKEN_SECRET] },
+  (req, res) => {
+    cors(req, res, async () => {
+      const { firstName, lastName, role } = req.body; // 🧠 Important: read from req.body now!
 
-  if (!firstName || !lastName || !role) {
-    throw new functions.https.HttpsError("invalid-argument", "Missing required fields.");
+      if (!firstName || !lastName || !role) {
+        return res.status(400).send("Missing required fields.");
+      }
+
+      const token = generateToken({ firstName, lastName, role }, TOKEN_SECRET.value());
+      res.status(200).json({ token });
+    });
   }
+);
 
-  const token = generateToken({ firstName, lastName, role }, TOKEN_SECRET.value());
-  return { token };
-});
+export const verifyAuthToken = onRequest(
+  { secrets: [TOKEN_SECRET] },
+  (req, res) => {
+    cors(req, res, async () => {
+      const { token } = req.body; // 🧠 Now reading from req.body instead of req.data!
 
-export const verifyAuthToken = onCall({ secrets: [TOKEN_SECRET] }, async (req) => {
-  const { token } = req.data;
+      const result = verifyToken(token, TOKEN_SECRET.value());
 
-  const result = verifyToken(token, TOKEN_SECRET.value());
+      if (!result) {
+        return res.status(401).send("Invalid or expired token.");
+      }
 
-  if (!result) {
-    throw new functions.https.HttpsError("unauthenticated", "Invalid or expired token.");
+      res.status(200).json(result);
+    });
   }
-
-  return result;
-});
+);
 
 
 

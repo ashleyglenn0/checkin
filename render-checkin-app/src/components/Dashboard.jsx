@@ -30,6 +30,7 @@ import {
 import CircleIcon from "@mui/icons-material/Circle";
 import { useTheme, createTheme, ThemeProvider } from "@mui/material/styles";
 import SendAlertDialog from "./SendAlertDialog";
+import BrandingSlotV2 from "./BrandingSlotV2"; // Adjust path if needed
 import { useAuth } from "../context/AuthContext";
 
 const renderTheme = createTheme({
@@ -44,9 +45,20 @@ const renderTheme = createTheme({
 const atlTheme = createTheme({
   palette: {
     mode: "light",
-    background: { default: "#e0f7f9", paper: "#ffffff" },
-    primary: { main: "#5ec3cc" },
-    text: { primary: "#004d61" },
+    background: {
+      default: "#f5f5f5", // Page background
+      paper: "#ffffff",   // Cards background
+    },
+    primary: {
+      main: "#ffb89e", // ✅ PEACH for buttons
+    },
+    text: {
+      primary: "#4f2b91", // ✅ Purple for card titles
+      secondary: "#2b2b36", // ✅ Dark navy for body text
+    },
+    secondary: {
+      main: "#68dcaf", // ✅ Green for accents (card borders/icons if needed)
+    },
   },
 });
 
@@ -129,25 +141,45 @@ const Dashboard = () => {
 
     const fetchStats = async () => {
       const today = new Date();
-      const startOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 0, 0, 0, 0);
-      const endOfDay = new Date(today.getFullYear(), today.getMonth(), today.getDate(), 23, 59, 59, 999);
-    
+      const startOfDay = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        0,
+        0,
+        0,
+        0
+      );
+      const endOfDay = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        23,
+        59,
+        59,
+        999
+      );
+
       const startTimestamp = Timestamp.fromDate(startOfDay);
       const endTimestamp = Timestamp.fromDate(endOfDay);
       const eventFilter = where("event", "==", activeEvent);
       const formattedDate = startOfDay.toLocaleDateString("en-US");
-    
+
       try {
-        const checkInsSnap = await getDocs(
-          query(
-            collection(db, "check_ins"),
-            eventFilter,
-            where("status", "==", "Checked In"),
-            where("timestamp", ">=", startTimestamp),
-            where("timestamp", "<=", endTimestamp)
-          )
+        const checkInsQuery = query(
+          collection(db, "check_ins"),
+          eventFilter,
+          where("status", "==", "Checked In"),
+          where("timestamp", ">=", startTimestamp),
+          where("timestamp", "<=", endTimestamp)
         );
-    
+        const checkInsSnap = await getDocs(checkInsQuery);
+
+        const validCheckIns = checkInsSnap.docs.filter(
+          (doc) => doc.data().role !== "admin"
+        );
+        setCheckIns(validCheckIns.length);
+
         const checkOutsSnap = await getDocs(
           query(
             collection(db, "check_ins"),
@@ -157,7 +189,7 @@ const Dashboard = () => {
             where("timestamp", "<=", endTimestamp)
           )
         );
-    
+
         const scheduledSnap = await getDocs(
           query(
             collection(db, "scheduled_volunteers"),
@@ -165,14 +197,13 @@ const Dashboard = () => {
             where("isAtlTechWeek", "==", isAtlTechWeek)
           )
         );
-    
-        setCheckIns(checkInsSnap.size);
+
         setCheckOuts(checkOutsSnap.size);
         setScheduledCount(scheduledSnap.size);
         if (scheduledSnap.size === 0) {
           setNoShows(0);
         } else {
-          const noShowCount = scheduledSnap.size - checkInsSnap.size;
+          const noShowCount = scheduledSnap.size - validCheckIns.length;
           setNoShows(noShowCount < 0 ? 0 : noShowCount);
         }
       } catch (err) {
@@ -239,13 +270,16 @@ const Dashboard = () => {
       setLongTaskVolunteers(volunteers.filter((v) => v.status === "overdue"));
     };
 
-    const unsubscribe = onSnapshot(collection(db, "traffic_levels"), (snapshot) => {
-      const levels = {};
-      snapshot.forEach((doc) => {
-        levels[doc.id] = doc.data().level;
-      });
-      setTrafficLevels(levels);
-    });
+    const unsubscribe = onSnapshot(
+      collection(db, "traffic_levels"),
+      (snapshot) => {
+        const levels = {};
+        snapshot.forEach((doc) => {
+          levels[doc.id] = doc.data().level;
+        });
+        setTrafficLevels(levels);
+      }
+    );
 
     fetchSlackMessages();
     fetchAlerts();
@@ -256,11 +290,22 @@ const Dashboard = () => {
   }, [isAtlTechWeek]);
 
   const currentTheme = isAtlTechWeek ? atlTheme : renderTheme;
-  const coverageRate = scheduledCount > 0 ? Math.round((checkIns / scheduledCount) * 100) : 0;
+  const coverageRate =
+    scheduledCount > 0 ? Math.round((checkIns / scheduledCount) * 100) : 0;
 
   const updateTrafficLevel = async (zone, level) => {
     const docRef = doc(db, "traffic_levels", zone);
     await setDoc(docRef, { level, event: activeEvent }, { merge: true });
+  };
+
+  const headerBackgroundColor = isAtlTechWeek ? "#68dcaf" : currentTheme.palette.background.default;
+
+  const headerButtonStyle = {
+    backgroundColor: isAtlTechWeek ? "#4f2b91" : currentTheme.palette.primary.main,
+    color: "white",
+    "&:hover": {
+      backgroundColor: isAtlTechWeek ? "#3a1c6d" : currentTheme.palette.primary.dark,
+    },
   };
 
   return (
@@ -273,24 +318,59 @@ const Dashboard = () => {
           position: "sticky",
           top: 0,
           zIndex: 10,
-          backgroundColor: currentTheme.palette.background.default,
+          backgroundColor: headerBackgroundColor,
           p: 2,
           mb: 2,
           borderBottom: "1px solid #ddd",
         }}
       >
-        <Stack direction={isMobile ? "column" : "row"} spacing={2} alignItems="center">
-          <Typography variant="h6" sx={{ flexGrow: 1 }}>
-            Admin Dashboard
-          </Typography>
-          <Button variant="outlined" onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}>
-            Switch to {isAtlTechWeek ? "Render" : "ATL Tech Week"}
+        <Stack
+          direction={isMobile ? "column" : "row"}
+          spacing={2}
+          alignItems="center"
+        >
+          <Box sx={{ flexGrow: 1 }}>
+            <BrandingSlotV2 currentEvent={activeEvent} />
+          </Box>
+          <Button
+            variant="outlined"
+            sx={headerButtonStyle}
+            onClick={() => setIsAtlTechWeek(!isAtlTechWeek)}
+          >
+            View Stats For {isAtlTechWeek ? "Render" : "ATL Tech Week"}
           </Button>
-          <Button variant="contained" onClick={() => navigate("/admin/schedule")}>View Schedule</Button>
-          <Button variant="contained" onClick={() => navigate("/admin/checkin")}>Back to Check-In</Button>
-          <Button variant="contained" onClick={() => navigate("/admin/reports")}>Reports</Button>
-          <Button variant="contained" color="primary" onClick={() => setOpenDialog(true)}>Send Alert</Button>
-          <Button variant="outlined" onClick={handleLogout}>Log Out</Button>
+          <Button
+            variant="contained"
+            sx={headerButtonStyle}
+            onClick={() => navigate("/admin/schedule")}
+          >
+            View Schedule
+          </Button>
+          <Button
+            variant="contained"
+            sx={headerButtonStyle}
+            onClick={() => navigate("/admin/checkin")}
+          >
+            Back to Check-In
+          </Button>
+          <Button
+            variant="contained"
+            sx={headerButtonStyle}
+            onClick={() => navigate("/admin/reports")}
+          >
+            Reports
+          </Button>
+          <Button
+            variant="contained"
+            color="primary"
+            sx={headerButtonStyle}
+            onClick={() => setOpenDialog(true)}
+          >
+            Send Alert
+          </Button>
+          <Button variant="outlined"  sx={headerButtonStyle} onClick={handleLogout}>
+            Log Out
+          </Button>
         </Stack>
       </Box>
 
@@ -325,7 +405,9 @@ const Dashboard = () => {
 
         {/* Traffic Monitor */}
         <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>Traffic Monitor</Typography>
+          <Typography variant="h6" gutterBottom>
+            Traffic Monitor
+          </Typography>
           {trafficZones.map((zone) => (
             <Box key={zone} sx={{ mb: 2 }}>
               <Typography variant="subtitle2">{zone}</Typography>
@@ -362,9 +444,11 @@ const Dashboard = () => {
             longTaskVolunteers.map((v, idx) => (
               <Box key={idx} sx={{ my: 0.5 }}>
                 <Typography>
-                  {v.name} - {v.task} - {v.duration} mins (Overdue by {v.overdueBy ??
+                  {v.name} - {v.task} - {v.duration} mins (Overdue by{" "}
+                  {v.overdueBy ??
                     v.duration -
-                      (v.task.toLowerCase().includes("food") ? 120 : 180)} mins)
+                      (v.task.toLowerCase().includes("food") ? 120 : 180)}{" "}
+                  mins)
                 </Typography>
               </Box>
             ))
