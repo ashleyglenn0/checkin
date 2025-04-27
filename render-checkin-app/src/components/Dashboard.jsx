@@ -46,18 +46,18 @@ const atlTheme = createTheme({
   palette: {
     mode: "light",
     background: {
-      default: "#f5f5f5", // Page background
-      paper: "#ffffff",   // Cards background
+      default: "#f5f5f5",
+      paper: "#ffffff",
     },
     primary: {
-      main: "#ffb89e", // ✅ PEACH for buttons
+      main: "#ffb89e",
     },
     text: {
-      primary: "#4f2b91", // ✅ Purple for card titles
-      secondary: "#2b2b36", // ✅ Dark navy for body text
+      primary: "#4f2b91",
+      secondary: "#2b2b36",
     },
     secondary: {
-      main: "#68dcaf", // ✅ Green for accents (card borders/icons if needed)
+      main: "#68dcaf",
     },
   },
 });
@@ -78,6 +78,8 @@ const Dashboard = () => {
   const [openDialog, setOpenDialog] = useState(false);
   const [slackMessages, setSlackMessages] = useState([]);
   const [trafficLevels, setTrafficLevels] = useState([]);
+  const [eventsActivatedToday, setEventsActivatedToday] = useState(0);
+  const [upcomingEvents, setUpcomingEvents] = useState([]);
   const [newAlert, setNewAlert] = useState({
     message: "",
     severity: "info",
@@ -227,6 +229,60 @@ const Dashboard = () => {
         console.error("Failed to fetch alerts:", error);
       }
     };
+    const fetchEventStats = async () => {
+      const today = new Date();
+      const startOfDay = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        0,
+        0,
+        0
+      );
+      const endOfDay = new Date(
+        today.getFullYear(),
+        today.getMonth(),
+        today.getDate(),
+        23,
+        59,
+        59
+      );
+
+      try {
+        const checkInsSnap = await getDocs(
+          query(
+            collection(db, "check_ins"),
+            where("timestamp", ">=", Timestamp.fromDate(startOfDay)),
+            where("timestamp", "<=", Timestamp.fromDate(endOfDay)),
+            where("event", "==", "ATL Tech Week")
+          )
+        );
+
+        const scheduledSnap = await getDocs(
+          query(
+            collection(db, "scheduled_volunteers"),
+            where("date", "==", startOfDay.toLocaleDateString("en-US")),
+            where("isAtlTechWeek", "==", true)
+          )
+        );
+
+        const activatedEventIds = new Set(
+          checkInsSnap.docs.map(
+            (doc) => doc.data().scheduledEventId || doc.data().eventId
+          )
+        );
+        setEventsActivatedToday(activatedEventIds.size);
+
+        const upcoming = scheduledSnap.docs.map((doc) => ({
+          name: doc.data().eventName || "Unnamed Event",
+          volunteersNeeded: doc.data().volunteersNeeded || 0,
+        }));
+
+        setUpcomingEvents(upcoming);
+      } catch (err) {
+        console.error("Error fetching event stats:", err);
+      }
+    };
 
     const fetchLongTaskVolunteers = async () => {
       const now = new Date();
@@ -285,6 +341,7 @@ const Dashboard = () => {
     fetchAlerts();
     fetchStats();
     fetchLongTaskVolunteers();
+    fetchEventStats();
 
     return () => unsubscribe();
   }, [isAtlTechWeek]);
@@ -298,13 +355,19 @@ const Dashboard = () => {
     await setDoc(docRef, { level, event: activeEvent }, { merge: true });
   };
 
-  const headerBackgroundColor = isAtlTechWeek ? "#68dcaf" : currentTheme.palette.background.default;
+  const headerBackgroundColor = isAtlTechWeek
+    ? "#68dcaf"
+    : currentTheme.palette.background.default;
 
   const headerButtonStyle = {
-    backgroundColor: isAtlTechWeek ? "#4f2b91" : currentTheme.palette.primary.main,
+    backgroundColor: isAtlTechWeek
+      ? "#4f2b91"
+      : currentTheme.palette.primary.main,
     color: "white",
     "&:hover": {
-      backgroundColor: isAtlTechWeek ? "#3a1c6d" : currentTheme.palette.primary.dark,
+      backgroundColor: isAtlTechWeek
+        ? "#3a1c6d"
+        : currentTheme.palette.primary.dark,
     },
   };
 
@@ -368,7 +431,11 @@ const Dashboard = () => {
           >
             Send Alert
           </Button>
-          <Button variant="outlined"  sx={headerButtonStyle} onClick={handleLogout}>
+          <Button
+            variant="outlined"
+            sx={headerButtonStyle}
+            onClick={handleLogout}
+          >
             Log Out
           </Button>
         </Stack>
@@ -404,34 +471,63 @@ const Dashboard = () => {
         </Grid>
 
         {/* Traffic Monitor */}
-        <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
-          <Typography variant="h6" gutterBottom>
-            Traffic Monitor
-          </Typography>
-          {trafficZones.map((zone) => (
-            <Box key={zone} sx={{ mb: 2 }}>
-              <Typography variant="subtitle2">{zone}</Typography>
-              <Stack direction="row" spacing={1} alignItems="center">
-                {[1, 2, 3, 4, 5].map((level) => (
-                  <IconButton
-                    key={level}
-                    size="small"
-                    onClick={() => updateTrafficLevel(zone, level)}
-                  >
-                    <CircleIcon
-                      sx={{
-                        color:
-                          level <= (trafficLevels[zone] || 0)
-                            ? currentTheme.palette.primary.main
-                            : "#ccc",
-                      }}
-                    />
-                  </IconButton>
-                ))}
-              </Stack>
-            </Box>
-          ))}
-        </Paper>
+        {isAtlTechWeek ? (
+          <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Events Activated Today: {eventsActivatedToday}
+            </Typography>
+
+            {upcomingEvents.length === 0 ? (
+              <Typography variant="body2">No upcoming events today.</Typography>
+            ) : (
+              upcomingEvents.slice(0, 5).map((event, idx) => (
+                <Box key={idx} sx={{ my: 1 }}>
+                  <Typography variant="subtitle2">{event.name}</Typography>
+                  <Typography variant="body2" color="textSecondary">
+                    Volunteers Needed: {event.volunteersNeeded}
+                  </Typography>
+                </Box>
+              ))
+            )}
+
+            <Button
+              variant="outlined"
+              sx={{ mt: 2 }}
+              onClick={() => navigate("/admin/full-event-list")}
+            >
+              See Full Event List
+            </Button>
+          </Paper>
+        ) : (
+          <Paper elevation={3} sx={{ p: 2, mb: 3 }}>
+            <Typography variant="h6" gutterBottom>
+              Traffic Monitor
+            </Typography>
+            {trafficZones.map((zone) => (
+              <Box key={zone} sx={{ mb: 2 }}>
+                <Typography variant="subtitle2">{zone}</Typography>
+                <Stack direction="row" spacing={1} alignItems="center">
+                  {[1, 2, 3, 4, 5].map((level) => (
+                    <IconButton
+                      key={level}
+                      size="small"
+                      onClick={() => updateTrafficLevel(zone, level)}
+                    >
+                      <CircleIcon
+                        sx={{
+                          color:
+                            level <= (trafficLevels[zone] || 0)
+                              ? currentTheme.palette.primary.main
+                              : "#ccc",
+                        }}
+                      />
+                    </IconButton>
+                  ))}
+                </Stack>
+              </Box>
+            ))}
+          </Paper>
+        )}
 
         {/* Long Task Volunteers */}
         <Paper elevation={2} sx={{ p: 2, mb: 2 }}>
